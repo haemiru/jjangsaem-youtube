@@ -3,7 +3,7 @@ import { Image as ImageIcon, RotateCw, Edit3, Settings2, ArrowRight, ArrowUp, Ar
 
 const COMMON_SUFFIX = ", Korean subjects, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content";
 
-const GEMINI_MODEL = 'gemini-2.0-flash-exp';
+const GEMINI_MODEL = 'gemini-3.1-pro-preview';
 const DELAY_BETWEEN_REQUESTS_MS = 3000;
 
 async function generateImageWithGemini(prompt, retries = 3) {
