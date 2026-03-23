@@ -9,6 +9,7 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
   const [error, setError] = useState('');
   
   const [showHookCot, setShowHookCot] = useState(false);
+  const [openPromptIdx, setOpenPromptIdx] = useState(null);
   const streamEndRef = useRef(null);
 
   // If already generated and we aren't currently generating, show the results
@@ -257,6 +258,12 @@ JSON만 출력.`;
     updateState('script', { ...globalScript, sections: newSections });
   };
 
+  const updateSectionPrompt = (idx, prompt) => {
+    const newSections = [...globalScript.sections];
+    newSections[idx].image_prompt = prompt;
+    updateState('script', { ...globalScript, sections: newSections });
+  };
+
   const selectTitle = (titleText) => {
     updateState('script', { ...globalScript, final_title: titleText });
     updateState('metadata', { ...globalState.metadata, title: titleText });
@@ -347,13 +354,24 @@ JSON만 출력.`;
                 <span className="status-badge" style={{ backgroundColor: 'var(--gray-200)' }}>⏱ {sec.duration_sec}초</span>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} title={sec.image_prompt}>
-                  <ImageIcon size={14}/> 프롬프트 보기
+                <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setOpenPromptIdx(openPromptIdx === idx ? null : idx)}>
+                  <ImageIcon size={14}/> {openPromptIdx === idx ? '프롬프트 닫기' : '프롬프트 보기'}
                 </button>
               </div>
             </div>
-            <textarea 
-              className="form-control" 
+            {openPromptIdx === idx && (
+              <div style={{ marginBottom: '0.75rem', padding: '0.75rem', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>이미지 생성 프롬프트</label>
+                <textarea
+                  className="form-control"
+                  style={{ minHeight: '80px', fontSize: '0.8125rem', lineHeight: '1.5' }}
+                  value={sec.image_prompt || ''}
+                  onChange={(e) => updateSectionPrompt(idx, e.target.value)}
+                />
+              </div>
+            )}
+            <textarea
+              className="form-control"
               style={{ minHeight: '120px', lineHeight: '1.6' }}
               value={sec.script}
               onChange={(e) => updateSectionText(idx, e.target.value)}
