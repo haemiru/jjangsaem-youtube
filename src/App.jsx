@@ -1,6 +1,5 @@
 import React, { useState, useEffect, createContext } from 'react';
 import {
-  Settings,
   ClipboardList,
   Search,
   FileText,
@@ -12,7 +11,6 @@ import {
 } from 'lucide-react';
 import './index.css';
 import * as pdfjsLib from 'pdfjs-dist';
-import SettingsModal from './components/SettingsModal';
 import PlanPanel from './components/PlanPanel';
 import BenchmarkPanel from './components/BenchmarkPanel';
 import ScriptPanel from './components/ScriptPanel';
@@ -34,10 +32,6 @@ const TABS = [
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 const INIT_STATE = {
-  settings: {
-    // Google OAuth Client ID is public — stored in browser
-    googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
-  },
   plan: { topic: '', format: '쇼츠 60초', targets: [], ebookName: '', ebookSummary: '', tone: '전문적', model: 'claude-opus-4-6' },
   benchmark: { channels: [], thumbnailPatterns: [], titleFormulas: [], tagPool: [] },
   script: { hook: '', bridge: '', sections: [], cta: '', titleSuggestions: [], thumbnailCopies: [] },
@@ -53,18 +47,6 @@ export const AppContext = createContext();
 export default function App() {
   const [globalState, setGlobalState] = useState(INIT_STATE);
   const [activeTab, setActiveTab] = useState('plan');
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
-  // Load Google Client ID from localStorage on init
-  useEffect(() => {
-    const savedClientId = localStorage.getItem('googleClientId');
-    if (savedClientId) {
-      setGlobalState(prev => ({
-        ...prev,
-        settings: { ...prev.settings, googleClientId: savedClientId }
-      }));
-    }
-  }, []);
 
   const updateState = (section, payload) => {
     setGlobalState(prev => ({
@@ -93,10 +75,6 @@ export default function App() {
             <PlaySquare color="var(--primary)" size={28} />
             <span>JjangSaem YouTube Auto</span>
           </div>
-          <button className="header-btn" onClick={() => setIsSettingsOpen(true)}>
-            <Settings size={18} />
-            설정
-          </button>
         </header>
 
         {/* Main Workspace */}
@@ -143,9 +121,6 @@ export default function App() {
           </div>
 
         </main>
-
-        {/* Settings Modal */}
-        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} globalState={globalState} updateState={updateState} />
 
       </div>
     </AppContext.Provider>

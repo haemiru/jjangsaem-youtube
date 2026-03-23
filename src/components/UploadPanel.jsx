@@ -6,7 +6,8 @@ import { requestAccessToken, verifyToken, fetchPlaylists, uploadVideo, setThumbn
 const Play = PlaySquare;
 
 export default function UploadPanel({ globalState, updateState, onNext }) {
-  const { plan, benchmark, script, media, settings, metadata, upload } = globalState;
+  const { plan, benchmark, script, media, metadata, upload } = globalState;
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
@@ -39,13 +40,13 @@ export default function UploadPanel({ globalState, updateState, onNext }) {
 
   // --- YouTube Auth ---
   const handleAuth = async () => {
-    if (!settings.googleClientId) {
-      setAuthError('설정에서 Google OAuth Client ID를 먼저 입력해주세요.');
+    if (!googleClientId) {
+      setAuthError('.env 파일에 VITE_GOOGLE_CLIENT_ID를 설정해주세요.');
       return;
     }
     setAuthError('');
     try {
-      const token = await requestAccessToken(settings.googleClientId);
+      const token = await requestAccessToken(googleClientId);
       setAccessToken(token);
       // Fetch playlists after auth
       try {
