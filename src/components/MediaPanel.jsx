@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Image as ImageIcon, RotateCw, Edit3, Settings2, ArrowRight, ArrowUp, ArrowDown, Type, AlertCircle, StopCircle, X, ZoomIn, Upload } from 'lucide-react';
+import { Image as ImageIcon, RotateCw, Edit3, Settings2, ArrowRight, ArrowUp, ArrowDown, Type, AlertCircle, StopCircle, X, ZoomIn, Upload, Film, Download, Loader2 } from 'lucide-react';
+import { synthesizeAllSections } from '../services/ttsService';
+import { VideoGenerator } from '../services/videoGenerator';
 
 const COMMON_SUFFIX = ", Korean subjects, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content";
 
@@ -84,6 +86,14 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
   const [timeline, setTimeline] = useState([]);
   const [bgm, setBgm] = useState('bgm_warm_morning');
   const [showSubtitle, setShowSubtitle] = useState(true);
+
+  // Video generation
+  const [videoProgress, setVideoProgress] = useState(null); // { step, label, current?, total? }
+  const [videoBlob, setVideoBlob] = useState(null);
+  const [videoUrl, setVideoUrl] = useState(null);
+  const [videoQuality, setVideoQuality] = useState('fast');
+  const [videoError, setVideoError] = useState('');
+  const videoGenRef = useRef(null);
 
   // Initialize queue
   useEffect(() => {
@@ -245,6 +255,62 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
       });
     }
   }, [completedCount]);
+
+  // --- Video Generation ---
+  const startVideoGeneration = async () => {
+    setVideoError('');
+    setVideoProgress({ step: 'tts', label: '음성 합성 준비 중...' });
+    setVideoBlob(null);
+    if (videoUrl) { URL.revokeObjectURL(videoUrl); setVideoUrl(null); }
+
+    try {
+      // 1. TTS
+      const ttsAudios = await synthesizeAllSections(script, setVideoProgress);
+
+      if (videoGenRef.current?.aborted) return;
+
+      // 2. Video generation
+      const bgmPath = bgm !== 'bgm_none' ? `/bgm/${bgm}.mp3` : null;
+      const generator = new VideoGenerator({
+        timeline,
+        ttsAudios,
+        bgmUrl: bgmPath,
+        showSubtitle,
+        isShorts,
+        quality: videoQuality,
+        onProgress: setVideoProgress,
+      });
+      videoGenRef.current = generator;
+
+      const blob = await generator.generateVideo();
+      if (!blob) return; // aborted
+
+      setVideoBlob(blob);
+      const url = URL.createObjectURL(blob);
+      setVideoUrl(url);
+      setVideoProgress({ step: 'done', label: '영상 생성 완료!' });
+
+      // Store for upload panel
+      updateState('media', { ...globalState.media, videoBlob: blob });
+    } catch (err) {
+      console.error('Video generation error:', err);
+      setVideoError(`영상 생성 실패: ${err.message}`);
+      setVideoProgress(null);
+    }
+  };
+
+  const stopVideoGeneration = () => {
+    videoGenRef.current?.abort();
+    setVideoProgress(null);
+  };
+
+  const downloadVideo = () => {
+    if (!videoUrl) return;
+    const a = document.createElement('a');
+    a.href = videoUrl;
+    a.download = `${plan.topic || 'video'}_${isShorts ? 'shorts' : 'regular'}.mp4`;
+    a.click();
+  };
 
   const moveTimelineItem = (idx, dir) => {
     const newTl = [...timeline];
@@ -513,6 +579,77 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* 4. Video Generation */}
+          {timeline.length > 0 && (
+            <div style={{ padding: '1.5rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
+              <h3 style={{ fontSize: '1.125rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Film size={18} color="var(--primary)" /> 영상 생성
+              </h3>
+
+              {!videoProgress && !videoUrl && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.875rem' }}>화질 선택</label>
+                    <div className="radio-group" style={{ gap: '0.5rem' }}>
+                      <label className={`radio-label ${videoQuality === 'fast' ? 'selected' : ''}`} style={{ flex: 1, justifyContent: 'center' }}>
+                        <input type="radio" className="radio-input" checked={videoQuality === 'fast'} onChange={() => setVideoQuality('fast')} />
+                        빠른 생성 (720p)
+                      </label>
+                      <label className={`radio-label ${videoQuality === 'standard' ? 'selected' : ''}`} style={{ flex: 1, justifyContent: 'center' }}>
+                        <input type="radio" className="radio-input" checked={videoQuality === 'standard'} onChange={() => setVideoQuality('standard')} />
+                        표준 (1080p)
+                      </label>
+                    </div>
+                  </div>
+                  <button className="btn-primary" onClick={startVideoGeneration} style={{ width: '100%' }}>
+                    <Film size={18} /> 영상 생성하기
+                  </button>
+                  {videoError && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', color: '#dc2626', fontSize: '0.875rem' }}>
+                      <AlertCircle size={16} /> {videoError}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {videoProgress && videoProgress.step !== 'done' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', padding: '2rem' }}>
+                  <Loader2 className="animate-spin" size={32} color="var(--primary)" />
+                  <div style={{ fontSize: '1.125rem', fontWeight: 600 }}>{videoProgress.label}</div>
+                  {videoProgress.total && (
+                    <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--gray-200)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ width: `${(videoProgress.current / videoProgress.total) * 100}%`, height: '100%', backgroundColor: 'var(--primary)', transition: 'width 0.2s' }} />
+                    </div>
+                  )}
+                  <button className="btn-secondary" onClick={stopVideoGeneration} style={{ color: '#dc2626', borderColor: '#dc2626' }}>
+                    <StopCircle size={16} /> 중지
+                  </button>
+                </div>
+              )}
+
+              {videoUrl && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <video
+                    src={videoUrl}
+                    controls
+                    style={{ width: '100%', maxHeight: '400px', borderRadius: 'var(--radius-md)', backgroundColor: '#000' }}
+                  />
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="btn-primary" onClick={downloadVideo} style={{ flex: 1 }}>
+                      <Download size={18} /> 다운로드
+                    </button>
+                    <button className="btn-secondary" onClick={() => { setVideoUrl(null); setVideoBlob(null); setVideoProgress(null); }} style={{ flex: 1 }}>
+                      다시 생성
+                    </button>
+                    <button className="btn-primary" onClick={onNext} style={{ flex: 1 }}>
+                      업로드 <ArrowRight size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -44,6 +44,25 @@ export default defineConfig(({ mode }) => {
             });
           }
         },
+        // Google Cloud TTS API proxy — injects API key as query param
+        '/api/tts': {
+          target: 'https://texttospeech.googleapis.com/v1',
+          changeOrigin: true,
+          rewrite: (path) => {
+            const rewritten = path.replace(/^\/api\/tts/, '');
+            if (env.GOOGLE_TTS_API_KEY) {
+              const separator = rewritten.includes('?') ? '&' : '?';
+              return `${rewritten}${separator}key=${env.GOOGLE_TTS_API_KEY}`;
+            }
+            return rewritten;
+          },
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.removeHeader('origin');
+              proxyReq.removeHeader('referer');
+            });
+          }
+        },
         // Gemini API proxy — injects API key as query param
         '/api/gemini': {
           target: 'https://generativelanguage.googleapis.com/v1beta',

@@ -3,6 +3,7 @@
     { "source": "/api/anthropic/(.*)", "destination": "/api/anthropic" },
     { "source": "/api/youtube/(.*)", "destination": "/api/youtube" },
     { "source": "/api/gemini/(.*)", "destination": "/api/gemini" },
+    { "source": "/api/tts/(.*)", "destination": "/api/tts" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
