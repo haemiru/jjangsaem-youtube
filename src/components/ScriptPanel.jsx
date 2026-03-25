@@ -121,26 +121,16 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
 전자책 요약본: ${plan.ebookSummary || '(없음)'}
 벤치마킹 감정 트리거: ${benchmark.titleFormulas?.triggerWords?.join(', ') || '없음'}
 
-바로 훅을 쓰지 말고, 반드시 아래 순서대로 생각한 뒤 작성해.
+아래 순서대로 생각한 뒤 훅을 작성해:
+1. 시청자 감정 상태 분석
+2. 가장 강한 감정 레버 파악
+3. 훅 유형 선택 (공감형/충격형/숫자형/궁금증형/손실형)
+4. 훅 초안 3개 작성 (각기 다른 유형, 100점 채점)
+5. 최고점 훅 선정 + 브릿지 문장 생성
 
-<thinking>
-1. 시청자 감정 상태: 이 영상을 틀었을 때 시청자는 어떤 상황인가?
-2. 가장 강한 감정 레버: 이 주제에서 시청자가 가장 두려워하거나 공감할 것은?
-3. 훅 유형 선택 (공감형/충격형/숫자형/궁금증형/손실형) + 선택 근거
-4. 훅 초안 3개 작성 (각기 다른 유형)
-5. 각 초안 채점 (100점 기준):
-   - 첫 문장 즉각 공감/호기심: /30
-   - 다음 문장이 궁금해지는 긴장감: /25
-   - 5초 이내 전달 가능한 길이: /20
-   - 내용과 일치 (낚시 없음): /15
-   - 짱샘 브랜드 톤 유지: /10
-6. 최고점 훅 선정 + 미달 항목 개선
-7. 브릿지 문장 생성 (훅 → 본문 연결)
-</thinking>
-
-사고 과정 완료 후 JSON으로 출력:
+JSON으로 출력:
 {
-  "cot_log": "위 thinking 과정 전체 텍스트 요약",
+  "cot_log": "위 사고 과정 전체 요약 (시청자 분석, 감정 레버, 채점 근거 등)",
   "hook_candidates": [
     { "type": "유형", "text": "훅 문장", "score": 95, "reason": "한줄평" }
   ],
@@ -153,10 +143,11 @@ JSON만 출력.`;
       const hookResponseText = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
         setStreamText(prev => prev + chunk);
       });
+      if (!hookResponseText || hookResponseText.trim().length === 0) throw new Error("훅 생성 단계에서 API 응답이 비어있습니다. 모델을 변경하거나 다시 시도해주세요.");
       chatHistory.push({ role: "assistant", content: hookResponseText });
-      
+
       hookResult = parseJSON(hookResponseText);
-      if (!hookResult) throw new Error("훅 생성 단계에서 JSON 파싱 실패\n응답: " + hookResponseText.substring(0, 200));
+      if (!hookResult) throw new Error("훅 생성 단계에서 JSON 파싱 실패\n응답: " + hookResponseText.substring(0, 300));
 
       // ===== STEP 2: SECTIONS =====
       setCurrentStep(2);
@@ -199,10 +190,11 @@ JSON만 출력.`;
       const sectionResponseText = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
         setStreamText(prev => prev + chunk);
       });
+      if (!sectionResponseText || sectionResponseText.trim().length === 0) throw new Error("본문 대본 생성 단계에서 API 응답이 비어있습니다. 다시 시도해주세요.");
       chatHistory.push({ role: "assistant", content: sectionResponseText });
 
       sectionResult = parseJSON(sectionResponseText);
-      if (!sectionResult) throw new Error("본문 대본 생성 단계에서 JSON 파싱 실패\n응답: " + sectionResponseText.substring(0, 200));
+      if (!sectionResult) throw new Error("본문 대본 생성 단계에서 JSON 파싱 실패\n응답: " + sectionResponseText.substring(0, 300));
 
       // ===== STEP 3: TITLES & THUMBNAILS =====
       setCurrentStep(3);
@@ -235,9 +227,10 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
       const titleResponseText = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
         setStreamText(prev => prev + chunk);
       });
+      if (!titleResponseText || titleResponseText.trim().length === 0) throw new Error("제목 생성 단계에서 API 응답이 비어있습니다. 다시 시도해주세요.");
 
       titleResult = parseJSON(titleResponseText);
-      if (!titleResult) throw new Error("제목 생성 단계에서 JSON 파싱 실패\n응답: " + titleResponseText.substring(0, 200));
+      if (!titleResult) throw new Error("제목 생성 단계에서 JSON 파싱 실패\n응답: " + titleResponseText.substring(0, 300));
 
       // ===== COMPLETE & SAVE =====
       const finalScriptState = {
@@ -554,7 +547,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
 
 // Stream fetching handler matching Anthropic Docs
 async function runClaudeStream(messages, model, _apiKey, onChunk) {
-  const systemPrompt = `당신은 jjangsaem.com의 유튜브 콘텐츠 전문가입니다. 피지오 후각 연구소 소속으로 발달장애 아동 및 가족을 위한 뇌과학 근거 중심의 전문적이고 따뜻한 어조로 작성합니다. 반드시 유효한 JSON 형식으로만 응답하세요. JSON 외의 텍스트를 출력하지 마세요.`;
+  const systemPrompt = `당신은 jjangsaem.com의 유튜브 콘텐츠 전문가입니다. 피지오 후각 연구소 소속으로 발달장애 아동 및 가족을 위한 뇌과학 근거 중심의 전문적이고 따뜻한 어조로 작성합니다. 반드시 유효한 JSON 형식으로 응답하세요. JSON 앞뒤에 불필요한 텍스트를 넣지 마세요.`;
 
   const response = await fetch('/api/anthropic/v1/messages', {
     method: 'POST',
