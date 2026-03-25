@@ -236,6 +236,16 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
     }
   }, [isAllCompleted, queue]);
 
+  // Sync queue to globalState so tab completion is detected
+  useEffect(() => {
+    if (completedCount > 0) {
+      updateState('media', {
+        ...globalState.media,
+        generatedImages: queue,
+      });
+    }
+  }, [completedCount]);
+
   const moveTimelineItem = (idx, dir) => {
     const newTl = [...timeline];
     if (dir === 'up' && idx > 0) {

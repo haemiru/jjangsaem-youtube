@@ -60,7 +60,7 @@ export default function App() {
     if (tabId === 'plan' && globalState.plan.topic.length > 0) return true;
     if (tabId === 'benchmark' && globalState.benchmark.channels.length > 0) return true;
     if (tabId === 'script' && globalState.script.final_hook) return true;
-    if (tabId === 'media' && globalState.media.timeline) return true;
+    if (tabId === 'media' && globalState.media.generatedImages?.some(q => q.status === 'done')) return true;
     if (tabId === 'upload' && globalState.upload.videoId) return true;
     return false;
   };
