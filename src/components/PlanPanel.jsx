@@ -142,6 +142,19 @@ ${pdfText.substring(0, 50000)} // 최대 약 5만자로 제한
           className="form-control"
           onChange={handleFileChange}
         />
+        <div style={{ marginTop: '0.75rem' }}>
+          <label className="form-label" style={{ fontSize: '0.875rem', color: 'var(--primary)' }}>전자책 구매 페이지 URL</label>
+          <input
+            type="url"
+            className="form-control"
+            value={data.ebookUrl || ''}
+            onChange={(e) => handleChange('ebookUrl', e.target.value)}
+            placeholder="예: https://jjangsaem.com/ebook/tummy-time-guide"
+          />
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+            유튜브 디스크립션에 전자책 링크로 삽입됩니다.
+          </p>
+        </div>
         {data.ebookName && (
            <div style={{ marginTop: '1rem' }}>
              <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>업로드된 파일: {data.ebookName}</div>

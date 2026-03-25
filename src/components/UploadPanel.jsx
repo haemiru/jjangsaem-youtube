@@ -142,12 +142,12 @@ JSON만 출력.`;
 
       const parsed = JSON.parse(match[0]);
 
-      // Auto Append UTM
-      const topicSlug = (plan.topic || 'video').slice(0, 15).replace(/\s+/g, '-');
-      const utmLink = `https://jjangsaem.com/ebook?utm_source=youtube&utm_medium=video&utm_campaign=${topicSlug}`;
-      parsed.description.text = parsed.description.text.replace(/jjangsaem\.com\/[^\s]*/g, utmLink);
-      if (!parsed.description.text.includes(utmLink)) {
-        parsed.description.text += `\n\n📚 연계 전자책 보기: ${utmLink}`;
+      // Auto Append ebook link
+      if (plan.ebookUrl) {
+        parsed.description.text = parsed.description.text.replace(/jjangsaem\.com\/[^\s]*/g, plan.ebookUrl);
+        if (!parsed.description.text.includes(plan.ebookUrl)) {
+          parsed.description.text += `\n\n📚 연계 전자책 보기: ${plan.ebookUrl}`;
+        }
       }
 
       setLocalMeta(parsed);
@@ -156,11 +156,11 @@ JSON만 출력.`;
     } catch (err) {
       console.error(err);
       // Fallback Mock
-      const utmLink = `https://jjangsaem.com/ebook?utm_source=youtube&utm_medium=video&utm_campaign=fallback`;
+      const ebookLine = plan.ebookUrl ? `\n\n📚 연계 전자책 보기: ${plan.ebookUrl}` : '';
       const fallback = {
         cot_log: "1. 검색 의도 분석...\n2. 키워드 계층 설계...\n3. 제목 선택...\n...",
         title: { text: script.final_title || '터미타임 성공 비법', score: 95, improvement_note: '감정 단어 추가' },
-        description: { text: `우리 아이 터미타임 잘하는 방법!\n\n0:00 오프닝\n0:30 본문 시작\n\n📚 전자책 보기: ${utmLink}`, score: 90, preview_lines: '우리 아이 터미타임 잘하는 방법!' },
+        description: { text: `우리 아이 터미타임 잘하는 방법!\n\n0:00 오프닝\n0:30 본문 시작${ebookLine}`, score: 90, preview_lines: '우리 아이 터미타임 잘하는 방법!' },
         tags: { list: ['육아', '터미타임', '신생아'], score: 90, char_count: 50 },
         hashtags: ['#육아꿀팁', '#터미타임', '#jjangsaem'],
         revision_count: 1
