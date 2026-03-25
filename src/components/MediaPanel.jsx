@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Image as ImageIcon, RotateCw, Edit3, Settings2, ArrowRight, ArrowUp, ArrowDown, Type, AlertCircle, StopCircle, X, ZoomIn } from 'lucide-react';
+import { Image as ImageIcon, RotateCw, Edit3, Settings2, ArrowRight, ArrowUp, ArrowDown, Type, AlertCircle, StopCircle, X, ZoomIn, Upload } from 'lucide-react';
 
 const COMMON_SUFFIX = ", Korean subjects, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content";
 
@@ -200,6 +200,21 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
     setQueue([...newQueue]);
   };
 
+  const uploadImage = (itemId, file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const newQueue = [...queue];
+      const idx = newQueue.findIndex(q => q.id === itemId);
+      if (idx === -1) return;
+      newQueue[idx].url = e.target.result;
+      newQueue[idx].status = 'done';
+      newQueue[idx].error = undefined;
+      setQueue([...newQueue]);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const completedCount = queue.filter(q => q.status === 'done').length;
   const errorCount = queue.filter(q => q.status === 'error').length;
   const isAllCompleted = completedCount === queue.length && queue.length > 0;
@@ -293,10 +308,9 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
           ))}
         </div>
 
-        {/* Generated Image Cards */}
-        {hasResults && (
+        {/* Image Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-            {queue.filter(item => item.status === 'done' || item.status === 'error').map(item => (
+            {queue.map(item => (
               <div key={item.id} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
                 {item.status === 'done' ? (
                   <div
@@ -307,23 +321,38 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
                       <ZoomIn size={14} color="white" />
                     </div>
                   </div>
-                ) : (
+                ) : item.status === 'error' ? (
                   <div style={{ height: '120px', backgroundColor: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626', fontSize: '0.75rem', padding: '0.5rem', textAlign: 'center' }}>
                     {item.error || '생성 실패'}
                   </div>
+                ) : item.status === 'generating' ? (
+                  <div style={{ height: '120px', backgroundColor: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <RotateCw className="animate-spin" size={24} color="var(--primary)" />
+                  </div>
+                ) : (
+                  <label style={{ height: '120px', backgroundColor: 'var(--gray-100)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: '0.25rem' }}>
+                    <Upload size={20} color="var(--text-muted)" />
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>이미지 업로드</span>
+                    <input type="file" accept="image/*" hidden onChange={(e) => uploadImage(item.id, e.target.files[0])} />
+                  </label>
                 )}
                 <div style={{ padding: '0.75rem' }}>
                   <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }}>{item.label}</div>
                   <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    {item.status === 'done' && (
+                      <label className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', flex: 1, cursor: 'pointer', textAlign: 'center' }}>
+                        <Upload size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '2px' }} /> 교체
+                        <input type="file" accept="image/*" hidden onChange={(e) => uploadImage(item.id, e.target.files[0])} />
+                      </label>
+                    )}
                     <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', flex: 1 }} onClick={() => regenerateSingle(item.id)} disabled={isGenerating}>
-                      {item.status === 'error' ? '재시도' : '재생성'}
+                      {item.status === 'done' ? '재생성' : item.status === 'error' ? '재시도' : 'AI 생성'}
                     </button>
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        )}
       </div>
 
       {hasResults && (
