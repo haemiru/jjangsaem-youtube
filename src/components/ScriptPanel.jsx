@@ -24,37 +24,64 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
 
   const parseJSON = (text) => {
     try {
-      // 1. Remove <thinking>...</thinking> blocks
+      // 1. Remove <thinking>...</thinking> blocks (greedy — handle unclosed tags too)
       let cleaned = text.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
-      
+      // If an unclosed <thinking> remains, strip from it to the end
+      cleaned = cleaned.replace(/<thinking>[\s\S]*/gi, '');
+
       // 2. Try to extract from markdown code blocks first
       const codeBlockMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
       if (codeBlockMatch) {
         cleaned = codeBlockMatch[1].trim();
       }
-      
+
       // 3. Try direct JSON parse
       try {
         return JSON.parse(cleaned);
       } catch {}
-      
-      // 4. Find the outermost balanced { ... }
-      const startIdx = cleaned.indexOf('{');
-      if (startIdx === -1) return null;
-      
-      let depth = 0;
-      let endIdx = -1;
-      for (let i = startIdx; i < cleaned.length; i++) {
-        if (cleaned[i] === '{') depth++;
-        else if (cleaned[i] === '}') {
-          depth--;
-          if (depth === 0) { endIdx = i; break; }
+
+      // 4. Find the LAST balanced { ... } (the final JSON block is usually the answer)
+      let lastValid = null;
+      let searchFrom = 0;
+      while (searchFrom < cleaned.length) {
+        const startIdx = cleaned.indexOf('{', searchFrom);
+        if (startIdx === -1) break;
+
+        let depth = 0;
+        let endIdx = -1;
+        for (let i = startIdx; i < cleaned.length; i++) {
+          if (cleaned[i] === '{') depth++;
+          else if (cleaned[i] === '}') {
+            depth--;
+            if (depth === 0) { endIdx = i; break; }
+          }
+        }
+
+        if (endIdx === -1) break;
+        const jsonStr = cleaned.substring(startIdx, endIdx + 1);
+        try {
+          lastValid = JSON.parse(jsonStr);
+        } catch {}
+        searchFrom = endIdx + 1;
+      }
+
+      if (lastValid) return lastValid;
+
+      // 5. Fallback: try the original text (before thinking removal) for balanced JSON
+      const rawStart = text.lastIndexOf('{');
+      if (rawStart !== -1) {
+        let depth = 0;
+        let endIdx = -1;
+        for (let i = rawStart; i < text.length; i++) {
+          if (text[i] === '{') depth++;
+          else if (text[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
+        }
+        if (endIdx !== -1) {
+          try { return JSON.parse(text.substring(rawStart, endIdx + 1)); } catch {}
         }
       }
-      
-      if (endIdx === -1) return null;
-      const jsonStr = cleaned.substring(startIdx, endIdx + 1);
-      return JSON.parse(jsonStr);
+
+      return null;
     } catch (err) {
       console.error('JSON 파싱 실패. 원본 응답:', text.substring(0, 500));
       return null;
@@ -120,7 +147,7 @@ JSON만 출력.`;
       chatHistory.push({ role: "assistant", content: hookResponseText });
       
       hookResult = parseJSON(hookResponseText);
-      if (!hookResult) throw new Error("훅 생성 단계에서 JSON 파싱 실패");
+      if (!hookResult) throw new Error("훅 생성 단계에서 JSON 파싱 실패\n응답: " + hookResponseText.substring(0, 200));
 
       // ===== STEP 2: SECTIONS =====
       setCurrentStep(2);
@@ -164,7 +191,7 @@ JSON만 출력.`;
       chatHistory.push({ role: "assistant", content: sectionResponseText });
 
       sectionResult = parseJSON(sectionResponseText);
-      if (!sectionResult) throw new Error("본문 대본 생성 단계에서 JSON 파싱 실패");
+      if (!sectionResult) throw new Error("본문 대본 생성 단계에서 JSON 파싱 실패\n응답: " + sectionResponseText.substring(0, 200));
 
       // ===== STEP 3: TITLES & THUMBNAILS =====
       setCurrentStep(3);
@@ -211,7 +238,7 @@ JSON만 출력.`;
       });
 
       titleResult = parseJSON(titleResponseText);
-      if (!titleResult) throw new Error("제목 생성 단계에서 JSON 파싱 실패");
+      if (!titleResult) throw new Error("제목 생성 단계에서 JSON 파싱 실패\n응답: " + titleResponseText.substring(0, 200));
 
       // ===== COMPLETE & SAVE =====
       const finalScriptState = {
