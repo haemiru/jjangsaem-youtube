@@ -42,7 +42,7 @@ export async function getAudioDuration(base64Audio) {
   }
 }
 
-export async function synthesizeAllSections(script, { tone = '따뜻한', onProgress } = {}) {
+export async function synthesizeAllSections(script, { tone = '따뜻한', onProgress, cachedAudios = [] } = {}) {
   const items = [];
 
   const textParts = [];
@@ -63,6 +63,20 @@ export async function synthesizeAllSections(script, { tone = '따뜻한', onProg
 
   for (let i = 0; i < textParts.length; i++) {
     const { id, text } = textParts[i];
+
+    // Resume: skip if already cached
+    const cached = cachedAudios.find(a => a.id === id);
+    if (cached) {
+      items.push(cached);
+      onProgress?.({
+        step: 'tts',
+        current: i + 1,
+        total: textParts.length,
+        label: `음성 캐시 사용 (${i + 1}/${textParts.length})`
+      });
+      continue;
+    }
+
     onProgress?.({
       step: 'tts',
       current: i + 1,

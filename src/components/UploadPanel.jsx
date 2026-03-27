@@ -11,6 +11,7 @@ export default function UploadPanel({ globalState, updateState, onNext }) {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [usedFallback, setUsedFallback] = useState(false);
 
   // Local metadata state for editing before upload
   const [localMeta, setLocalMeta] = useState(null);
@@ -155,6 +156,7 @@ JSON만 출력.`;
 
     } catch (err) {
       console.error(err);
+      setUsedFallback(true);
       // Fallback Mock
       const ebookLine = plan.ebookUrl ? `\n\n📚 연계 전자책 보기: ${plan.ebookUrl}` : '';
       const fallback = {
@@ -290,6 +292,12 @@ JSON만 출력.`;
         <h2 className="panel-title" style={{ margin: 0 }}>메타데이터 (SEO) 검토 및 업로드</h2>
         <button className="btn-secondary" onClick={generateMetadata}>전체 재생성</button>
       </div>
+
+      {usedFallback && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', backgroundColor: '#fffbeb', border: '1px solid #fbbf24', borderRadius: 'var(--radius-md)', color: '#92400e', fontSize: '0.875rem' }}>
+          <AlertCircle size={16} style={{ flexShrink: 0 }} /> AI 메타데이터 생성에 실패하여 샘플 데이터를 사용 중입니다. 내용을 직접 수정하거나 "전체 재생성" 버튼으로 다시 시도해주세요.
+        </div>
+      )}
 
       {/* Title */}
       <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.5rem' }}>

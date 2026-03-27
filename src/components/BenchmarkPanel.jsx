@@ -4,6 +4,7 @@ import { Search, Image as ImageIcon, Type, Target, Link as LinkIcon, AlertCircle
 export default function BenchmarkPanel({ globalState, updateState, onNext }) {
   const [progress, setProgress] = useState({ step: 0, text: '', error: '' });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [fallbackWarning, setFallbackWarning] = useState('');
 
   const { plan, benchmark } = globalState;
 
@@ -27,7 +28,12 @@ export default function BenchmarkPanel({ globalState, updateState, onNext }) {
       setProgress({ step: 2, text: '📺 유사 채널 수집 중...', error: '' });
 
       // 2. Collect Channels
-      const { channels, popularVideos, allTags } = await collectChannels(keywords);
+      const { channels, popularVideos, allTags, usedFallback } = await collectChannels(keywords);
+      if (usedFallback) {
+        setFallbackWarning('YouTube API에서 조건에 맞는 채널을 찾지 못해 샘플 데이터를 사용합니다. 결과를 참고용으로만 활용해주세요.');
+      } else {
+        setFallbackWarning('');
+      }
 
       // 3. Analyze Thumbnails (skip for Shorts)
       const isShorts = plan.format === '쇼츠 60초';
@@ -117,6 +123,11 @@ export default function BenchmarkPanel({ globalState, updateState, onNext }) {
 
       {hasResults && !isProcessing && (
         <>
+          {fallbackWarning && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', backgroundColor: '#fffbeb', border: '1px solid #fbbf24', borderRadius: 'var(--radius-md)', color: '#92400e', fontSize: '0.875rem' }}>
+              <AlertCircle size={16} style={{ flexShrink: 0 }} /> {fallbackWarning}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: plan.format === '쇼츠 60초' ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
             {/* Thumbnail Pattern Card (숏츠가 아닐 때만 표시) */}
             {plan.format !== '쇼츠 60초' && (
@@ -324,7 +335,9 @@ async function collectChannels(keywords) {
   }
 
   // 모의 데이터 (API 미동작/조건 미달 대비 Fallback)
+  let usedFallback = false;
   if (finalChannels.length === 0) {
+    usedFallback = true;
     finalChannels.push({
       channelId: 'UC_dummy', channelTitle: '모의 육아 채널', subscriberCount: 25000, viewCount: 1500000
     });
@@ -338,7 +351,7 @@ async function collectChannels(keywords) {
     }
   }
 
-  return { channels: finalChannels, popularVideos, allTags };
+  return { channels: finalChannels, popularVideos, allTags, usedFallback };
 }
 
 async function analyzeThumbnails(thumbnails) {

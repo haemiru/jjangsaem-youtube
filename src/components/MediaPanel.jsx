@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Image as ImageIcon, RotateCw, Edit3, Settings2, ArrowRight, ArrowUp, ArrowDown, Type, AlertCircle, StopCircle, X, ZoomIn, Upload, Film, Download, Loader2 } from 'lucide-react';
+import { Image as ImageIcon, RotateCw, Edit3, Settings2, ArrowRight, ArrowUp, ArrowDown, Type, AlertCircle, StopCircle, X, ZoomIn, Upload, Film, Download, Loader2, Play, Save } from 'lucide-react';
 import { synthesizeAllSections, TONE_OPTIONS } from '../services/ttsService';
 import { VideoGenerator } from '../services/videoGenerator';
 
@@ -96,6 +96,17 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
   const [videoError, setVideoError] = useState('');
   const videoGenRef = useRef(null);
 
+  // Thumbnail canvas export
+  const thumbCanvasRef = useRef(null);
+
+  // Timeline preview
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const [previewIdx, setPreviewIdx] = useState(0);
+  const previewTimerRef = useRef(null);
+
+  // TTS resume (keep completed audios across retries)
+  const [cachedTtsAudios, setCachedTtsAudios] = useState([]);
+
   // Initialize queue
   useEffect(() => {
     if (!script.hook) return;
@@ -124,7 +135,7 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
 
     const outroPrompt = script.outro_image_prompt
       ? `${script.outro_image_prompt}${suffix}`
-      : `Clean outro background with jjangsaem.com text placeholder.${suffix}`;
+      : `Warm, clean ending card background with soft gradient, subtle sparkle effect, Korean text area in center, suitable for thank you message and channel subscription CTA.${suffix}`;
     items.push({ id: 'outro', label: '엔딩', prompt: outroPrompt, status: 'idle', url: null });
 
     setQueue(items);
@@ -265,8 +276,19 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
     if (videoUrl) { URL.revokeObjectURL(videoUrl); setVideoUrl(null); }
 
     try {
-      // 1. TTS
-      const ttsAudios = await synthesizeAllSections(script, { tone: ttsTone, onProgress: setVideoProgress });
+      // 1. TTS — resume from cached audios if available
+      let ttsAudios;
+      if (cachedTtsAudios.length > 0) {
+        setVideoProgress({ step: 'tts', label: `이전 음성 ${cachedTtsAudios.length}개 재사용, 나머지 생성 중...` });
+        ttsAudios = await synthesizeAllSections(script, {
+          tone: ttsTone,
+          onProgress: setVideoProgress,
+          cachedAudios: cachedTtsAudios,
+        });
+      } else {
+        ttsAudios = await synthesizeAllSections(script, { tone: ttsTone, onProgress: setVideoProgress });
+      }
+      setCachedTtsAudios(ttsAudios);
 
       if (videoGenRef.current?.aborted) return;
 
@@ -295,7 +317,7 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
       updateState('media', { ...globalState.media, videoBlob: blob });
     } catch (err) {
       console.error('Video generation error:', err);
-      setVideoError(`영상 생성 실패: ${err.message}`);
+      setVideoError(`영상 생성 실패: ${err.message}. "다시 시도" 버튼으로 이어서 생성할 수 있습니다.`);
       setVideoProgress(null);
     }
   };
@@ -311,6 +333,80 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
     a.href = videoUrl;
     a.download = `${plan.topic || 'video'}_${isShorts ? 'shorts' : 'regular'}.mp4`;
     a.click();
+  };
+
+  // --- Thumbnail Export ---
+  const exportThumbnail = (variant = 'A') => {
+    const thumbItem = queue.find(q => q.id === (variant === 'A' ? 'thumb_a' : 'thumb_b') && q.status === 'done');
+    if (!thumbItem?.url) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280;
+    canvas.height = 720;
+    const ctx = canvas.getContext('2d');
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      // Background image
+      ctx.drawImage(img, 0, 0, 1280, 720);
+
+      // Dimmer
+      ctx.fillStyle = `rgba(0, 0, 0, ${thumbSettings.dim / 100})`;
+      ctx.fillRect(0, 0, 1280, 720);
+
+      // Text overlay
+      ctx.font = `bold ${thumbSettings.size * (1280 / 600)}px 'Noto Sans KR', sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = thumbSettings.color;
+      ctx.shadowColor = 'rgba(0,0,0,0.8)';
+      ctx.shadowBlur = 8;
+
+      const textY = thumbSettings.position === 'top' ? 150
+        : thumbSettings.position === 'middle' ? 360 : 570;
+
+      ctx.fillText(thumbSettings.text, 640, textY, 1100);
+      ctx.shadowBlur = 0;
+
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `thumbnail_${variant}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    };
+    img.src = thumbItem.url;
+  };
+
+  const saveThumbAB = () => {
+    exportThumbnail('A');
+    setTimeout(() => exportThumbnail('B'), 500);
+  };
+
+  // --- Timeline Preview ---
+  const startPreview = () => {
+    if (timeline.length === 0) return;
+    setPreviewPlaying(true);
+    setPreviewIdx(0);
+    let idx = 0;
+    const advance = () => {
+      idx++;
+      if (idx >= timeline.length) {
+        setPreviewPlaying(false);
+        setPreviewIdx(0);
+        return;
+      }
+      setPreviewIdx(idx);
+      previewTimerRef.current = setTimeout(advance, Math.min(timeline[idx].duration, 3) * 1000);
+    };
+    previewTimerRef.current = setTimeout(advance, Math.min(timeline[0].duration, 3) * 1000);
+  };
+
+  const stopPreview = () => {
+    setPreviewPlaying(false);
+    clearTimeout(previewTimerRef.current);
   };
 
   const moveTimelineItem = (idx, dir) => {
@@ -519,7 +615,14 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
                   <label className="form-label" style={{ fontSize: '0.75rem' }}>배경 어둡기 ({thumbSettings.dim}%)</label>
                   <input type="range" min="0" max="80" value={thumbSettings.dim} onChange={e => setThumbSettings(p => ({ ...p, dim: parseInt(e.target.value) }))} style={{ width: '100%' }} />
                 </div>
-                <button className="btn-secondary" style={{ marginTop: 'auto' }}>A/B 버전으로 둘 다 저장</button>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
+                  <button className="btn-secondary" style={{ flex: 1 }} onClick={saveThumbAB}>
+                    <Save size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />A/B 둘 다 저장
+                  </button>
+                  <button className="btn-secondary" style={{ flex: 1 }} onClick={() => exportThumbnail('A')}>
+                    <Download size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />A만 저장
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -574,12 +677,31 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
                     </label>
                   </div>
                   <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <button className="btn-secondary" style={{ width: '100%' }} onClick={previewPlaying ? stopPreview : startPreview}>
+                      {previewPlaying ? <><StopCircle size={16} /> 미리보기 중지</> : <><Play size={16} /> 타임라인 미리보기</>}
+                    </button>
                     <button className="btn-primary" style={{ width: '100%' }} onClick={onNext}>
                       메타데이터 생성 <ArrowRight size={18} />
                     </button>
                   </div>
                 </div>
               </div>
+
+              {/* Timeline Preview */}
+              {previewPlaying && timeline[previewIdx] && (
+                <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                  <div style={{ position: 'relative', display: 'inline-block', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '2px solid var(--primary)' }}>
+                    <img
+                      src={timeline[previewIdx].url}
+                      alt={timeline[previewIdx].label}
+                      style={{ maxHeight: '250px', objectFit: 'contain', display: 'block' }}
+                    />
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0.5rem', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', fontSize: '0.875rem', textAlign: 'center' }}>
+                      {timeline[previewIdx].label} ({previewIdx + 1}/{timeline.length})
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -620,8 +742,15 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
                     <Film size={18} /> 영상 생성하기
                   </button>
                   {videoError && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', color: '#dc2626', fontSize: '0.875rem' }}>
-                      <AlertCircle size={16} /> {videoError}
+                    <div style={{ padding: '0.75rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', fontSize: '0.875rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626', marginBottom: cachedTtsAudios.length > 0 ? '0.5rem' : 0 }}>
+                        <AlertCircle size={16} /> {videoError}
+                      </div>
+                      {cachedTtsAudios.length > 0 && (
+                        <div style={{ fontSize: '0.8rem', color: '#92400e' }}>
+                          음성 {cachedTtsAudios.length}개가 캐시되어 있어 이어서 생성됩니다.
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
