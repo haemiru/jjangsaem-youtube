@@ -1,15 +1,21 @@
-const TTS_VOICE = 'ko-KR-Neural2-A';
-const TTS_SPEAKING_RATE = 0.95;
-const DELAY_BETWEEN_CALLS = 500;
+// 톤앤매너에 따른 스타일 프롬프트 매핑
+const STYLE_PROMPTS = {
+  전문적: '전문 치료사처럼 차분하고 신뢰감 있는 목소리로 또렷하게 읽어주세요.',
+  따뜻한: '따뜻하고 친근한 목소리로, 육아에 지친 부모님께 말하듯 천천히 읽어주세요.',
+  교육적: '선생님처럼 명확하고 이해하기 쉽게, 핵심을 강조하며 읽어주세요.',
+};
 
-export async function synthesizeSpeech(text) {
-  const res = await fetch('/api/tts/text:synthesize', {
+export const TONE_OPTIONS = Object.keys(STYLE_PROMPTS);
+
+const DELAY_BETWEEN_CALLS = 800;
+
+export async function synthesizeSpeech(text, tone = '따뜻한') {
+  const res = await fetch('/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      input: { text },
-      voice: { languageCode: 'ko-KR', name: TTS_VOICE },
-      audioConfig: { audioEncoding: 'MP3', speakingRate: TTS_SPEAKING_RATE }
+      text,
+      stylePrompt: STYLE_PROMPTS[tone] || STYLE_PROMPTS['따뜻한']
     })
   });
 
@@ -19,7 +25,7 @@ export async function synthesizeSpeech(text) {
   }
 
   const data = await res.json();
-  return data.audioContent; // base64 MP3
+  return data.audioContent; // base64 WAV
 }
 
 export async function getAudioDuration(base64Audio) {
@@ -36,13 +42,15 @@ export async function getAudioDuration(base64Audio) {
   }
 }
 
-export async function synthesizeAllSections(script, onProgress) {
+export async function synthesizeAllSections(script, { tone = '따뜻한', onProgress } = {}) {
   const items = [];
 
-  // Build text list from script structure
   const textParts = [];
   if (script.hook) {
-    textParts.push({ id: 'intro', text: script.hook + (script.bridge ? ' ' + script.bridge : '') });
+    textParts.push({
+      id: 'intro',
+      text: script.hook + (script.bridge ? ' ' + script.bridge : '')
+    });
   }
   if (script.sections) {
     script.sections.forEach((sec, idx) => {
@@ -55,14 +63,18 @@ export async function synthesizeAllSections(script, onProgress) {
 
   for (let i = 0; i < textParts.length; i++) {
     const { id, text } = textParts[i];
-    onProgress?.({ step: 'tts', current: i + 1, total: textParts.length, label: `음성 합성 중... (${i + 1}/${textParts.length})` });
+    onProgress?.({
+      step: 'tts',
+      current: i + 1,
+      total: textParts.length,
+      label: `음성 생성 중... (${i + 1}/${textParts.length})`
+    });
 
-    const audioBase64 = await synthesizeSpeech(text);
+    const audioBase64 = await synthesizeSpeech(text, tone);
     const duration = await getAudioDuration(audioBase64);
 
     items.push({ id, audioBase64, duration, text });
 
-    // Rate limit
     if (i < textParts.length - 1) {
       await new Promise(r => setTimeout(r, DELAY_BETWEEN_CALLS));
     }

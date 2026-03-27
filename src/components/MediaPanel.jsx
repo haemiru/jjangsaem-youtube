@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Image as ImageIcon, RotateCw, Edit3, Settings2, ArrowRight, ArrowUp, ArrowDown, Type, AlertCircle, StopCircle, X, ZoomIn, Upload, Film, Download, Loader2 } from 'lucide-react';
-import { synthesizeAllSections } from '../services/ttsService';
+import { synthesizeAllSections, TONE_OPTIONS } from '../services/ttsService';
 import { VideoGenerator } from '../services/videoGenerator';
 
 const COMMON_SUFFIX = ", Korean subjects, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content";
@@ -92,6 +92,7 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
   const [videoBlob, setVideoBlob] = useState(null);
   const [videoUrl, setVideoUrl] = useState(null);
   const [videoQuality, setVideoQuality] = useState('fast');
+  const [ttsTone, setTtsTone] = useState('따뜻한');
   const [videoError, setVideoError] = useState('');
   const videoGenRef = useRef(null);
 
@@ -265,7 +266,7 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
 
     try {
       // 1. TTS
-      const ttsAudios = await synthesizeAllSections(script, setVideoProgress);
+      const ttsAudios = await synthesizeAllSections(script, { tone: ttsTone, onProgress: setVideoProgress });
 
       if (videoGenRef.current?.aborted) return;
 
@@ -591,6 +592,17 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
 
               {!videoProgress && !videoUrl && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.875rem' }}>음성 톤 선택</label>
+                    <div className="radio-group" style={{ gap: '0.5rem' }}>
+                      {TONE_OPTIONS.map(tone => (
+                        <label key={tone} className={`radio-label ${ttsTone === tone ? 'selected' : ''}`} style={{ flex: 1, justifyContent: 'center' }}>
+                          <input type="radio" className="radio-input" checked={ttsTone === tone} onChange={() => setTtsTone(tone)} />
+                          {tone}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                   <div>
                     <label className="form-label" style={{ fontSize: '0.875rem' }}>화질 선택</label>
                     <div className="radio-group" style={{ gap: '0.5rem' }}>
