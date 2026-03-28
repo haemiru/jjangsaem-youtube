@@ -22,8 +22,12 @@ export default function BenchmarkPanel({ globalState, updateState, onNext }) {
 
     try {
       // 1. Keyword Extraction
-      const keywords = await fetchKeywords(plan.topic);
-      if (!keywords || keywords.length === 0) throw new Error('키워드 추출 실패');
+      let keywords = await fetchKeywords(plan.topic);
+      if (!keywords || keywords.length === 0) {
+        // Fallback: use topic words as keywords
+        keywords = plan.topic.split(/\s+/).filter(w => w.length > 1);
+        if (keywords.length === 0) throw new Error('키워드 추출 실패');
+      }
 
       setProgress({ step: 2, text: '📺 유사 채널 수집 중...', error: '' });
 
@@ -46,16 +50,22 @@ export default function BenchmarkPanel({ globalState, updateState, onNext }) {
 
       setProgress({ step: isShorts ? 3 : 4, text: '📊 제목 공식 추출 중...', error: '' });
 
-      // 4. Analyze Titles
-      const titles = popularVideos.map(v => v.title).slice(0, 20);
-      const titleFormulas = await analyzeTitles(titles);
+      // 4. Analyze Titles — prefer relevant videos
+      const relevantVideos = popularVideos.filter(v => v.relevant);
+      const titlesToAnalyze = relevantVideos.length >= 5
+        ? relevantVideos.map(v => v.title).slice(0, 20)
+        : popularVideos.map(v => v.title).slice(0, 20);
+      const titleFormulas = titlesToAnalyze.length > 0 ? await analyzeTitles(titlesToAnalyze) : null;
 
       setProgress({ step: isShorts ? 4 : 5, text: '✅ 벤치마킹 완료', error: '' });
 
-      // 5. Build Tag Pool
+      // 5. Build Tag Pool — filter out generic/irrelevant tags
+      const genericTags = new Set(['브이로그', 'vlog', 'VLOG', '일상', '영국', '미국', '일본', '직장인', '정리해고', '회사', '퇴사', '여행']);
       const tagFreq = {};
       allTags.forEach(tag => {
-        tagFreq[tag] = (tagFreq[tag] || 0) + 1;
+        if (!genericTags.has(tag) && tag.length > 1) {
+          tagFreq[tag] = (tagFreq[tag] || 0) + 1;
+        }
       });
       const tagPool = Object.entries(tagFreq)
         .sort((a,b) => b[1] - a[1])
@@ -250,7 +260,16 @@ async function fetchKeywords(topic) {
       max_tokens: 300,
       messages: [{
         role: "user",
-        content: `다음 유튜브 주제로 한국인이 검색할 키워드 5개를 JSON 배열로만 출력해줘.\n주제: ${topic}\n출력 형식: ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5"]`
+        content: `다음 유튜브 영상 주제와 직접적으로 관련된 검색 키워드 5개를 생성해줘.
+주제: ${topic}
+
+규칙:
+- 반드시 이 주제의 핵심 내용과 직접 관련된 키워드만 생성
+- 너무 일반적인 키워드(육아, 일상, 브이로그 등)는 제외
+- 유튜브에서 이 주제의 영상을 찾을 때 실제로 사용할 구체적인 검색어
+- JSON 배열로만 출력
+
+출력 형식: ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5"]`
       }]
     })
   });
@@ -261,52 +280,70 @@ async function fetchKeywords(topic) {
   if (match) {
     try {
       return JSON.parse(match[0]);
-    } catch(e) { return ["육아", "터미타임", "육아꿀팁", "신생아", "발달"]; }
+    } catch(e) { return null; }
   }
-  return ["육아팁", "신생아", "터미타임", "아기", "발달"];
+  return null;
 }
 
 async function collectChannels(keywords) {
-  let channelIds = new Set();
+  let channelMap = new Map(); // channelId -> relevance count
 
-  // 1. Search for channels via keywords (routed through server-side proxy)
-  for (const kw of keywords.slice(0, 3)) { // max 3 to save quota
-    const searchRes = await fetch(`/api/youtube/search?part=snippet&type=video&q=${encodeURIComponent(kw)}&maxResults=10`);
+  // 1. Search for videos via keywords — track how many keywords each channel matches
+  for (const kw of keywords.slice(0, 5)) {
+    const searchRes = await fetch(`/api/youtube/search?part=snippet&type=video&q=${encodeURIComponent(kw)}&maxResults=10&relevanceLanguage=ko&regionCode=KR`);
     if(searchRes.ok) {
       const data = await searchRes.json();
-      data.items?.forEach(item => channelIds.add(item.snippet.channelId));
+      data.items?.forEach(item => {
+        const chId = item.snippet.channelId;
+        channelMap.set(chId, (channelMap.get(chId) || 0) + 1);
+      });
     }
   }
 
+  // Sort by relevance (channels appearing in more keyword searches first)
+  const sortedChannelIds = [...channelMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => id);
+
   // 2. Fetch channel stats and filter
-  const cIds = Array.from(channelIds).slice(0, 20); // API max 50, use 20
-  if (cIds.length === 0) return { channels: [], popularVideos: [], allTags: [] };
+  const cIds = sortedChannelIds.slice(0, 25);
+  if (cIds.length === 0) return { channels: [], popularVideos: [], allTags: [], usedFallback: false };
 
   const chRes = await fetch(`/api/youtube/channels?part=statistics,snippet&id=${cIds.join(',')}`);
   const chData = await chRes.json();
-  
+
+  // Build keyword set for relevance checking
+  const keywordSet = keywords.map(k => k.toLowerCase());
+
   const validChannels = [];
   for (const ch of (chData.items || [])) {
     const subs = parseInt(ch.statistics.subscriberCount || '0', 10);
     const views = parseInt(ch.statistics.viewCount || '0', 10);
     const videoCount = parseInt(ch.statistics.videoCount || '1', 10);
-    
-    // 조건: 구독자 수 < 50,000
-    // 최근 영상 평균 조회수 대체 로직 (전체조회수/전체영상수) > 3,000 (할당량 문제로 근사치)
-    // 조회수/구독자 비율: 전체조회수/(구독자수 || 1) > 0.3 (임의 스탯)
-    if (subs < 50000 && (views / videoCount) > 3000 && (views / Math.max(subs, 1)) > 0.3) {
+    const chTitle = (ch.snippet.title || '').toLowerCase();
+    const chDesc = (ch.snippet.description || '').toLowerCase();
+
+    // Channel relevance check: title or description must contain at least one keyword
+    const isRelevant = keywordSet.some(kw => chTitle.includes(kw) || chDesc.includes(kw));
+    const relevanceScore = channelMap.get(ch.id) || 0;
+
+    // Relaxed stats filter + relevance requirement
+    if (subs < 100000 && (views / videoCount) > 1000 && (isRelevant || relevanceScore >= 2)) {
       validChannels.push({
         channelId: ch.id,
         channelTitle: ch.snippet.title,
         subscriberCount: subs,
-        viewCount: views
+        viewCount: views,
+        relevanceScore
       });
     }
   }
 
-  const finalChannels = validChannels.slice(0, 8); // 최대 8개
-  
-  // 3. Collect popular videos & tags
+  // Sort by relevance score
+  validChannels.sort((a, b) => b.relevanceScore - a.relevanceScore);
+  const finalChannels = validChannels.slice(0, 8);
+
+  // 3. Collect popular videos & tags — filter by keyword relevance
   let popularVideos = [];
   let allTags = [];
 
@@ -318,16 +355,32 @@ async function collectChannels(keywords) {
       if (vIds.length > 0) {
         const dRes = await fetch(`/api/youtube/videos?part=snippet&id=${vIds.join(',')}`);
         const dData = await dRes.json();
-        
+
         dData.items?.forEach(vd => {
+          const title = vd.snippet.title || '';
+          // Only include videos whose title has some relevance to keywords
+          const titleLower = title.toLowerCase();
+          const videoRelevant = keywordSet.some(kw => titleLower.includes(kw));
+
           popularVideos.push({
-            title: vd.snippet.title,
+            title,
             thumbnail: vd.snippet.thumbnails?.high?.url || vd.snippet.thumbnails?.default?.url,
-            viewCount: 0, // Needs statistics part, skipped to save quota
-            description: (vd.snippet.description || '').substring(0, 100)
+            viewCount: 0,
+            description: (vd.snippet.description || '').substring(0, 100),
+            relevant: videoRelevant
           });
           if (vd.snippet.tags) {
-            allTags.push(...vd.snippet.tags);
+            // Only include tags from relevant videos, or tags that match keywords
+            if (videoRelevant) {
+              allTags.push(...vd.snippet.tags);
+            } else {
+              // From non-relevant videos, only keep tags that match a keyword
+              vd.snippet.tags.forEach(tag => {
+                if (keywordSet.some(kw => tag.toLowerCase().includes(kw) || kw.includes(tag.toLowerCase()))) {
+                  allTags.push(tag);
+                }
+              });
+            }
           }
         });
       }
