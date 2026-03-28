@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Image as ImageIcon, RotateCw, Edit3, Settings2, ArrowRight, ArrowUp, ArrowDown, Type, AlertCircle, StopCircle, X, ZoomIn, Upload, Film, Download, Loader2, Play, Save } from 'lucide-react';
+import { Image as ImageIcon, RotateCw, Edit3, Settings2, ArrowRight, ArrowUp, ArrowDown, Type, AlertCircle, StopCircle, X, ZoomIn, Upload, Film, Download, Loader2, Play, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import { synthesizeAllSections, TONE_OPTIONS } from '../services/ttsService';
 import { VideoGenerator } from '../services/videoGenerator';
 
@@ -106,6 +106,9 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
 
   // TTS resume (keep completed audios across retries)
   const [cachedTtsAudios, setCachedTtsAudios] = useState([]);
+
+  // Prompt editing for image cards
+  const [editingPromptId, setEditingPromptId] = useState(null);
 
   // Initialize queue
   useEffect(() => {
@@ -335,6 +338,11 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
     a.click();
   };
 
+  const updatePrompt = (itemId, newPrompt) => {
+    const newQueue = queue.map(q => q.id === itemId ? { ...q, prompt: newPrompt } : q);
+    setQueue(newQueue);
+  };
+
   // --- Thumbnail Export ---
   const exportThumbnail = (variant = 'A') => {
     const thumbItem = queue.find(q => q.id === (variant === 'A' ? 'thumb_a' : 'thumb_b') && q.status === 'done');
@@ -526,7 +534,24 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
                   </label>
                 )}
                 <div style={{ padding: '0.75rem' }}>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }}>{item.label}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{item.label}</span>
+                    <button
+                      onClick={() => setEditingPromptId(editingPromptId === item.id ? null : item.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
+                      title="프롬프트 보기/수정"
+                    >
+                      {editingPromptId === item.id ? <ChevronUp size={14} /> : <Edit3 size={14} />}
+                    </button>
+                  </div>
+                  {editingPromptId === item.id && (
+                    <textarea
+                      className="form-control"
+                      style={{ fontSize: '0.7rem', minHeight: '60px', marginBottom: '0.5rem', lineHeight: '1.4' }}
+                      value={item.prompt}
+                      onChange={(e) => updatePrompt(item.id, e.target.value)}
+                    />
+                  )}
                   <div style={{ display: 'flex', gap: '0.25rem' }}>
                     {item.status === 'done' && (
                       <label className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', flex: 1, cursor: 'pointer', textAlign: 'center' }}>
@@ -681,7 +706,7 @@ export default function MediaPanel({ globalState, updateState, onNext }) {
                       {previewPlaying ? <><StopCircle size={16} /> 미리보기 중지</> : <><Play size={16} /> 타임라인 미리보기</>}
                     </button>
                     <button className="btn-primary" style={{ width: '100%' }} onClick={onNext}>
-                      메타데이터 생성 <ArrowRight size={18} />
+                      다음 단계 (업로드) <ArrowRight size={18} />
                     </button>
                   </div>
                 </div>
