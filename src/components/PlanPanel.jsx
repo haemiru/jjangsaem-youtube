@@ -409,7 +409,7 @@ ${pdfText.substring(0, 50000)}`;
       </div>
 
       <div className="form-group">
-        <label className="form-label">Claude 모델 선택</label>
+        <label className="form-label">대본 생성 모델 선택</label>
         <div className="radio-group">
           {[
             { id: 'claude-opus-4-6', label: 'claude-opus-4-6 (최고 품질)' },
