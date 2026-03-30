@@ -225,20 +225,39 @@ ${pdfText.substring(0, 50000)}`;
           </p>
         </div>
 
-        {/* Series Generation Button */}
-        {data.ebookName && !hasSeries && (
-          <button
-            className="btn-primary"
-            style={{ marginTop: '1rem', width: '100%', padding: '0.75rem', fontSize: '1rem' }}
-            onClick={generateSeriesPlan}
-            disabled={isGeneratingSeries}
-          >
-            {isGeneratingSeries ? (
-              <><Loader2 className="animate-spin" size={18} /> 전자책 분석 및 시리즈 기획 중...</>
-            ) : (
-              '전자책 분석하여 영상 시리즈 기획하기'
+        {/* Series Generation Button — always show when ebook name exists */}
+        {data.ebookName && (
+          <div style={{ marginTop: '1rem' }}>
+            {!localFile && (
+              <p style={{ fontSize: '0.8125rem', color: '#d97706', marginBottom: '0.5rem' }}>
+                PDF 파일을 다시 선택해주세요 (페이지 새로고침 시 파일이 초기화됩니다).
+              </p>
             )}
-          </button>
+            {!hasSeries && (
+              <button
+                className="btn-primary"
+                onClick={generateSeriesPlan}
+                disabled={isGeneratingSeries || !localFile}
+                style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', opacity: (!localFile && !isGeneratingSeries) ? 0.5 : 1 }}
+              >
+                {isGeneratingSeries ? (
+                  <><Loader2 className="animate-spin" size={18} /> 전자책 분석 및 시리즈 기획 중...</>
+                ) : (
+                  '전자책 분석하여 영상 시리즈 기획하기'
+                )}
+              </button>
+            )}
+            {hasSeries && (
+              <button
+                className="btn-secondary"
+                style={{ width: '100%', padding: '0.5rem', fontSize: '0.875rem' }}
+                onClick={generateSeriesPlan}
+                disabled={isGeneratingSeries || !localFile}
+              >
+                {isGeneratingSeries ? <><Loader2 className="animate-spin" size={14} /> 시리즈 재생성 중...</> : '시리즈 재생성'}
+              </button>
+            )}
+          </div>
         )}
         {seriesError && <div style={{ color: 'red', fontSize: '0.875rem', marginTop: '0.5rem' }}>{seriesError}</div>}
       </div>
@@ -246,16 +265,8 @@ ${pdfText.substring(0, 50000)}`;
       {/* Step 2: Series Plan */}
       {hasSeries && (
         <div className="form-group" style={{ padding: '1.25rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div style={{ marginBottom: '1rem' }}>
             <label className="form-label" style={{ margin: 0, fontSize: '1rem' }}>2. 영상 시리즈 ({completedCount}/{seriesPlan.items.length} 완료)</label>
-            <button
-              className="btn-secondary"
-              style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
-              onClick={generateSeriesPlan}
-              disabled={isGeneratingSeries}
-            >
-              {isGeneratingSeries ? <Loader2 className="animate-spin" size={14} /> : '시리즈 재생성'}
-            </button>
           </div>
 
           {/* Progress bar */}
