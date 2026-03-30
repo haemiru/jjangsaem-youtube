@@ -32,7 +32,7 @@ const TABS = [
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 const INIT_STATE = {
-  plan: { topic: '', format: '쇼츠 60초', targets: [], ebookName: '', ebookSummary: '', ebookUrl: '', tone: '전문적', model: 'claude-opus-4-6' },
+  plan: { topic: '', format: '쇼츠 60초', targets: [], ebookName: '', ebookSummary: '', ebookUrl: '', tone: '전문적', model: 'claude-opus-4-6', characterImage: '', characterDescription: '' },
   benchmark: { channels: [], thumbnailPatterns: [], titleFormulas: [], tagPool: [] },
   script: { hook: '', bridge: '', sections: [], cta: '', titleSuggestions: [], thumbnailCopies: [] },
   media: { selectedThumbnailCopy: '', imagePrompts: [], generatedImages: [], selectedThumbnail: '' },
@@ -108,10 +108,10 @@ export default function App() {
             <BenchmarkPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('script')} />
           </div>
           <div style={{ display: activeTab === 'script' ? 'block' : 'none' }}>
-            <ScriptPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('media')} />
+            <ScriptPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('upload')} />
           </div>
           <div style={{ display: activeTab === 'media' ? 'block' : 'none' }}>
-            <MediaPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('upload')} />
+            <MediaPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('upload')} disabled={true} />
           </div>
           <div style={{ display: activeTab === 'upload' ? 'block' : 'none' }}>
             <UploadPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('dashboard')} />

@@ -81,12 +81,14 @@ export default function UploadPanel({ globalState, updateState, onNext }) {
       const formula = JSON.stringify(benchmark.titleFormulas?.formulas || []);
       const tags = (benchmark.tagPool || []).join(', ');
 
+      const fullScript = script.full_script || script.rows?.map(r => r.script).join('\n') || '';
       const systemPrompt = "당신은 유튜브 SEO 전문가이자 jjangsaem.com 콘텐츠 전략가입니다. 한국 육아·발달 분야 유튜브 채널의 검색 최적화에 특화되어 있습니다. 항상 JSON 형식으로만 응답합니다.";
       const prompt = `아래 정보를 바탕으로 유튜브 메타데이터를 작성해줘.
 
 [대본 정보]
 최종 제목 후보: ${titleCands}
 핵심 메시지: ${keyMsgs}
+전체 대본: ${fullScript.substring(0, 3000)}
 연계 전자책: ${plan.ebookName}
 대상 시청자: ${plan.targets.join(', ')}
 
@@ -106,8 +108,14 @@ export default function UploadPanel({ globalState, updateState, onNext }) {
 
 [초안 생성 후 아래 기준으로 즉시 자기채점]
 제목 평가: 앞30자 키워드/25 + 감정트리거/25 + 패턴부합/20 + 브랜드톤/15 + 시청자언어/15
-설명 평가: 첫2줄 클릭유도/30 + 키워드삽입/25 + 타임스탬프SEO/20 + CTA자연스러움/25
+설명 평가: 첫2줄 클릭유도/30 + 키워드삽입/25 + 내용충실도/25 + CTA자연스러움/20
 태그 평가: 4종균형/25 + 경쟁도최적화/25 + 벤치마킹활용/25 + 500자활용/25
+
+[디스크립션 작성 규칙 - 중요!]
+- 타임스탬프(타임라인)는 넣지 마세요
+- 대신 영상의 핵심 내용을 풍부하게 요약해주세요 (최소 500자 이상)
+- 구성: 첫 2줄 클릭 유도 → 영상 핵심 내용 요약 (3~5개 포인트) → 관련 키워드/정보 → 전자책 소개 → 구독/좋아요 CTA
+- 시청자가 디스크립션만 읽어도 영상 내용을 파악할 수 있도록 상세하게 작성
 
 [60점 미만 항목은 즉시 재작성 후 재채점, 최대 3회 반복]
 
@@ -115,7 +123,7 @@ export default function UploadPanel({ globalState, updateState, onNext }) {
 {
   "cot_log": "전체 사고 과정",
   "title": { "text": "최종 제목", "score": 92, "improvement_note": "개선 내용" },
-  "description": { "text": "전체 설명 텍스트 (타임스탬프 포함)", "score": 87, "preview_lines": "첫 2줄" },
+  "description": { "text": "전체 설명 텍스트 (타임스탬프 없이, 내용 풍부하게)", "score": 87, "preview_lines": "첫 2줄" },
   "tags": { "list": ["태그1", "태그2"], "score": 89, "char_count": 487 },
   "hashtags": ["#해시태그1", "#해시태그2", "#해시태그3"],
   "revision_count": 2

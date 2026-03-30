@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Image as ImageIcon, RotateCw, Edit3, Settings2, ArrowRight, ArrowUp, ArrowDown, Type, AlertCircle, StopCircle, X, ZoomIn, Upload, Film, Download, Loader2, Play, Save, ChevronDown, ChevronUp } from 'lucide-react';
-import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
-import { VideoGenerator } from '../services/videoGenerator';
+import React from 'react';
+import { Image as ImageIcon, ArrowRight } from 'lucide-react';
+
+// Legacy imports kept for future re-enablement
+// import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
+// import { VideoGenerator } from '../services/videoGenerator';
 
 const COMMON_SUFFIX = ", Korean subjects, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content";
 
@@ -79,7 +81,24 @@ async function generateImageWithGemini(prompt, referenceImage = null, retries = 
   }
 }
 
-export default function MediaPanel({ globalState, updateState, onNext }) {
+export default function MediaPanel({ globalState, updateState, onNext, disabled }) {
+  // Disabled mode - show placeholder
+  if (disabled) {
+    return (
+      <div className="panel-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
+        <ImageIcon size={48} color="var(--gray-300)" style={{ marginBottom: '1rem' }} />
+        <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'var(--text-muted)' }}>미디어 생성 (비활성화)</h2>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', textAlign: 'center', lineHeight: '1.6' }}>
+          현재 캡컷(CapCut) 등 외부 도구로 영상을 제작하는 워크플로우를 사용 중입니다.<br/>
+          대본 단계에서 생성된 이미지/영상 프롬프트를 활용하세요.
+        </p>
+        <button className="btn-primary" onClick={onNext}>
+          업로드 단계로 이동 <ArrowRight size={20} />
+        </button>
+      </div>
+    );
+  }
+
   const { plan, script, benchmark } = globalState;
   const isShorts = plan?.format?.includes('쇼츠');
 

@@ -5,23 +5,19 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
   const { plan, benchmark, settings, script: globalScript } = globalState;
 
   const [streamText, setStreamText] = useState('');
-  const [currentStep, setCurrentStep] = useState(0); // 0: idle, 1: hook, 2: section, 3: titles, 4: done
+  const [currentStep, setCurrentStep] = useState(0); // 0: idle, 1: hook, 2: rows, 3: titles, 4: done
   const [error, setError] = useState('');
-  
+
   const [showHookCot, setShowHookCot] = useState(false);
-  const [openPromptIdx, setOpenPromptIdx] = useState(null);
-  const [showIntroPrompt, setShowIntroPrompt] = useState(false);
-  const [showOutroPrompt, setShowOutroPrompt] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
-  const copyPrompt = (text, id) => {
+  const copyText = (text, id) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 1500);
   };
   const streamEndRef = useRef(null);
 
-  // If already generated and we aren't currently generating, show the results
   const isGenerating = currentStep > 0 && currentStep < 4;
   const hasResults = globalScript && globalScript.final_hook && !isGenerating && currentStep === 0;
 
@@ -33,68 +29,37 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
 
   const parseJSON = (text) => {
     try {
-      // 1. Remove <thinking>...</thinking> blocks (greedy — handle unclosed tags too)
       let cleaned = text.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
-      // If an unclosed <thinking> remains, strip from it to the end
       cleaned = cleaned.replace(/<thinking>[\s\S]*/gi, '');
-
-      // 2. Try to extract from markdown code blocks first
       const codeBlockMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-      if (codeBlockMatch) {
-        cleaned = codeBlockMatch[1].trim();
-      }
-
-      // 3. Try direct JSON parse
-      try {
-        return JSON.parse(cleaned);
-      } catch {}
-
-      // 4. Find the LAST balanced { ... } (the final JSON block is usually the answer)
+      if (codeBlockMatch) cleaned = codeBlockMatch[1].trim();
+      try { return JSON.parse(cleaned); } catch {}
       let lastValid = null;
       let searchFrom = 0;
       while (searchFrom < cleaned.length) {
         const startIdx = cleaned.indexOf('{', searchFrom);
         if (startIdx === -1) break;
-
-        let depth = 0;
-        let endIdx = -1;
+        let depth = 0, endIdx = -1;
         for (let i = startIdx; i < cleaned.length; i++) {
           if (cleaned[i] === '{') depth++;
-          else if (cleaned[i] === '}') {
-            depth--;
-            if (depth === 0) { endIdx = i; break; }
-          }
+          else if (cleaned[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
         }
-
         if (endIdx === -1) break;
-        const jsonStr = cleaned.substring(startIdx, endIdx + 1);
-        try {
-          lastValid = JSON.parse(jsonStr);
-        } catch {}
+        try { lastValid = JSON.parse(cleaned.substring(startIdx, endIdx + 1)); } catch {}
         searchFrom = endIdx + 1;
       }
-
       if (lastValid) return lastValid;
-
-      // 5. Fallback: try the original text (before thinking removal) for balanced JSON
       const rawStart = text.lastIndexOf('{');
       if (rawStart !== -1) {
-        let depth = 0;
-        let endIdx = -1;
+        let depth = 0, endIdx = -1;
         for (let i = rawStart; i < text.length; i++) {
           if (text[i] === '{') depth++;
           else if (text[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
         }
-        if (endIdx !== -1) {
-          try { return JSON.parse(text.substring(rawStart, endIdx + 1)); } catch {}
-        }
+        if (endIdx !== -1) { try { return JSON.parse(text.substring(rawStart, endIdx + 1)); } catch {} }
       }
-
       return null;
-    } catch (err) {
-      console.error('JSON 파싱 실패. 원본 응답:', text.substring(0, 500));
-      return null;
-    }
+    } catch { return null; }
   };
 
   const generateAll = async () => {
@@ -104,8 +69,12 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
 
     let chatHistory = [];
     let hookResult = null;
-    let sectionResult = null;
+    let rowsResult = null;
     let titleResult = null;
+
+    const charDesc = plan.characterDescription
+      ? `캐릭터 설명: ${plan.characterDescription}`
+      : '업로드된 캐릭터 이미지를 참고';
 
     try {
       // ===== STEP 1: HOOK =====
@@ -143,58 +112,63 @@ JSON만 출력.`;
       const hookResponseText = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
         setStreamText(prev => prev + chunk);
       });
-      if (!hookResponseText || hookResponseText.trim().length === 0) throw new Error("훅 생성 단계에서 API 응답이 비어있습니다. 모델을 변경하거나 다시 시도해주세요.");
+      if (!hookResponseText || hookResponseText.trim().length === 0) throw new Error("훅 생성 단계에서 API 응답이 비어있습니다.");
       chatHistory.push({ role: "assistant", content: hookResponseText });
 
       hookResult = parseJSON(hookResponseText);
       if (!hookResult) throw new Error("훅 생성 단계에서 JSON 파싱 실패\n응답: " + hookResponseText.substring(0, 300));
 
-      // ===== STEP 2: SECTIONS =====
+      // ===== STEP 2: SENTENCE-LEVEL ROWS (대본 + 이미지 프롬프트 + 영상 프롬프트) =====
       setCurrentStep(2);
-      setStreamText(prev => prev + '\n\n=== [2/3] 본문 대본 작성 중 ===\n\n');
-      
-      const sectionPrompt = `위에서 생성한 훅을 이어받아 본문 대본을 작성해줘.
+      setStreamText(prev => prev + '\n\n=== [2/3] 문장 단위 대본 + 이미지/영상 프롬프트 생성 중 ===\n\n');
+
+      const rowsPrompt = `위에서 생성한 훅을 이어받아 본문 대본을 작성하고, 각 문장마다 이미지 프롬프트와 영상 프롬프트를 함께 생성해줘.
 
 [훅] ${hookResult.final_hook.text}
 [브릿지] ${hookResult.bridge}
 
 포맷: ${plan.format}
 연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
-벤치마킹 제목 공식: ${benchmark?.titleFormulas?.formulas?.[0]?.pattern || '없음'}
+
+[스타일 가이드]
+- 이 영상은 특정 캐릭터를 활용한 화이트보드 애니메이션 스타일입니다.
+- ${charDesc}
+- 모든 이미지는 흰색 배경 위에 캐릭터와 간단한 텍스트/아이콘으로 구성됩니다.
+- Nick Invests 채널처럼 깔끔하고 미니멀한 교육 콘텐츠 스타일입니다.
+
+[출력 규칙]
+1. 대본을 1~2문장 단위로 끊어서 rows 배열에 넣어줘 (총 15~25개 row 정도)
+2. 각 row의 image_prompt: 해당 문장을 시각화하는 이미지 프롬프트 (영어)
+   - 반드시 "white background" 포함
+   - 캐릭터가 등장하며 해당 내용을 설명하는 포즈/표정
+   - 핵심 키워드를 텍스트로 표시
+3. 각 row의 video_prompt: 해당 이미지를 5초 영상으로 만들기 위한 Grok 영상 생성 프롬프트 (영어)
+   - 카메라 움직임, 캐릭터 애니메이션, 텍스트 등장 효과 등 포함
+4. 훅과 브릿지도 첫 번째 row들로 포함
+5. CTA(구독/전자책 언급)도 마지막 row들로 포함
 
 JSON 출력:
 {
-  "intro_image_prompt": "오프닝 배경 이미지 생성 프롬프트 (영어, 훅 내용을 시각화)",
-  "sections": [
+  "rows": [
     {
-      "id": 1,
-      "title": "섹션 제목",
-      "script": "읽을 대본 전문",
-      "duration_sec": 30,
-      "image_prompt": "이 섹션용 이미지 생성 프롬프트 (영어, 한국인 등장)
-- ${plan.ebookName ? `[${plan.ebookName}] 연계 전자책의 핵심 노하우를 자연스럽게 녹여냄` : '전문적인 노하우를 자연스럽게 녹여냄'}
-- 핵심 메시지 요약 (1문장)",
-      "key_message": "핵심 한 줄 요약"
+      "script": "대본 문장 (한국어)",
+      "image_prompt": "Clean white background, character standing with ... (영어)",
+      "video_prompt": "Camera slowly zooms in on character who ... (영어)"
     }
   ],
-  "cta": {
-    "text": "CTA 대본",
-    "ebook_mention": "전자책 언급 문구",
-    "duration_sec": 15
-  },
-  "outro_image_prompt": "엔딩 배경 이미지 생성 프롬프트 (영어, 깔끔한 아웃트로)"
+  "full_script": "전체 대본을 이어붙인 텍스트 (복사용)"
 }
 JSON만 출력.`;
 
-      chatHistory.push({ role: "user", content: sectionPrompt });
-      const sectionResponseText = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
+      chatHistory.push({ role: "user", content: rowsPrompt });
+      const rowsResponseText = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
         setStreamText(prev => prev + chunk);
       });
-      if (!sectionResponseText || sectionResponseText.trim().length === 0) throw new Error("본문 대본 생성 단계에서 API 응답이 비어있습니다. 다시 시도해주세요.");
-      chatHistory.push({ role: "assistant", content: sectionResponseText });
+      if (!rowsResponseText || rowsResponseText.trim().length === 0) throw new Error("본문 대본 생성 단계에서 API 응답이 비어있습니다.");
+      chatHistory.push({ role: "assistant", content: rowsResponseText });
 
-      sectionResult = parseJSON(sectionResponseText);
-      if (!sectionResult) throw new Error("본문 대본 생성 단계에서 JSON 파싱 실패\n응답: " + sectionResponseText.substring(0, 300));
+      rowsResult = parseJSON(rowsResponseText);
+      if (!rowsResult) throw new Error("본문 대본 생성 단계에서 JSON 파싱 실패\n응답: " + rowsResponseText.substring(0, 300));
 
       // ===== STEP 3: TITLES & THUMBNAILS =====
       setCurrentStep(3);
@@ -203,7 +177,7 @@ JSON만 출력.`;
       const isShorts = plan.format === '쇼츠 60초';
       const titlePrompt = `완성된 대본을 바탕으로 제목 후보${isShorts ? '' : '와 썸네일 문구'}를 만들어줘.
 
-[대본 요약] ${(sectionResult.sections || []).map(s => s.key_message).join(', ')}
+[대본 요약] ${rowsResult.rows?.slice(0, 5).map(r => r.script).join(' ')}
 [벤치마킹 제목 공식] ${JSON.stringify(benchmark?.titleFormulas?.formulas || [])}
 [핵심 태그] ${(benchmark?.tagPool || []).slice(0, 10).join(', ')}
 [포맷] ${plan.format}
@@ -227,37 +201,34 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
       const titleResponseText = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
         setStreamText(prev => prev + chunk);
       });
-      if (!titleResponseText || titleResponseText.trim().length === 0) throw new Error("제목 생성 단계에서 API 응답이 비어있습니다. 다시 시도해주세요.");
+      if (!titleResponseText || titleResponseText.trim().length === 0) throw new Error("제목 생성 단계에서 API 응답이 비어있습니다.");
 
       titleResult = parseJSON(titleResponseText);
       if (!titleResult) throw new Error("제목 생성 단계에서 JSON 파싱 실패\n응답: " + titleResponseText.substring(0, 300));
 
       // ===== COMPLETE & SAVE =====
+      const fullScript = rowsResult.full_script || rowsResult.rows?.map(r => r.script).join('\n') || '';
+
       const finalScriptState = {
         ...globalScript,
         cot_log: hookResult.cot_log,
         hook: hookResult.final_hook.text,
         bridge: hookResult.bridge,
-        intro_image_prompt: sectionResult.intro_image_prompt || '',
-        outro_image_prompt: sectionResult.outro_image_prompt || '',
-        sections: sectionResult.sections || [],
-        cta: sectionResult.cta || {},
+        rows: rowsResult.rows || [],
+        full_script: fullScript,
         titleSuggestions: titleResult.title_candidates || [],
         thumbnailCopies: titleResult.thumbnail_candidates || [],
         final_title: titleResult.final_title,
         final_thumbnail_copy: titleResult.final_thumbnail_copy,
         final_hook: hookResult.final_hook
       };
-      
+
       updateState('script', finalScriptState);
-      
-      // Also write to metadata
       updateState('metadata', {
         ...globalState.metadata,
         title: titleResult.final_title,
-        description: sectionResult.sections?.map(s => s.key_message).join(' ') || ''
+        description: fullScript.substring(0, 200)
       });
-
       updateState('media', {
         ...globalState.media,
         selectedThumbnailCopy: titleResult.final_thumbnail_copy
@@ -273,16 +244,10 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
     }
   };
 
-  const updateSectionText = (idx, text) => {
-    const newSections = [...globalScript.sections];
-    newSections[idx].script = text;
-    updateState('script', { ...globalScript, sections: newSections });
-  };
-
-  const updateSectionPrompt = (idx, prompt) => {
-    const newSections = [...globalScript.sections];
-    newSections[idx].image_prompt = prompt;
-    updateState('script', { ...globalScript, sections: newSections });
+  const updateRowField = (idx, field, value) => {
+    const newRows = [...globalScript.rows];
+    newRows[idx] = { ...newRows[idx], [field]: value };
+    updateState('script', { ...globalScript, rows: newRows });
   };
 
   const selectTitle = (titleText) => {
@@ -298,17 +263,14 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
     updateState('script', { ...globalScript, bridge: text });
   };
 
-  const updateCtaText = (text) => {
-    updateState('script', { ...globalScript, cta: { ...globalScript.cta, text } });
-  };
-
-  const updateCtaEbook = (text) => {
-    updateState('script', { ...globalScript, cta: { ...globalScript.cta, ebook_mention: text } });
-  };
-
   const selectThumbnail = (thumbText) => {
     updateState('script', { ...globalScript, final_thumbnail_copy: thumbText });
     updateState('media', { ...globalState.media, selectedThumbnailCopy: thumbText });
+  };
+
+  // Get full script text for copy
+  const getFullScriptText = () => {
+    return globalScript.full_script || globalScript.rows?.map(r => r.script).join('\n') || '';
   };
 
   if (!hasResults && currentStep === 0) {
@@ -317,14 +279,14 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         <FileText size={48} color="var(--gray-300)" style={{ marginBottom: '1rem' }} />
         <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>대본 자동 생성</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', textAlign: 'center' }}>
-          기획 및 벤치마킹된 데이터를 바탕으로<br/>전문적이고 타겟에 맞는 대본을 생성합니다.
+          기획 및 벤치마킹된 데이터를 바탕으로<br/>문장 단위 대본 + 이미지/영상 프롬프트를 생성합니다.
         </p>
         <button className="btn-primary" onClick={generateAll}>
           <Play fill="white" size={18} /> 대본 생성 시작하기
         </button>
-        {error && <div style={{ color: 'red', marginTop: '1rem' }}>{error}</div>}
+        {error && <div style={{ color: 'red', marginTop: '1rem', whiteSpace: 'pre-wrap' }}>{error}</div>}
         <button className="btn-secondary" onClick={onNext} style={{ marginTop: '1rem', opacity: 0.7 }}>
-          건너뛰고 미디어 생성 →
+          건너뛰고 업로드 단계 →
         </button>
       </div>
     );
@@ -334,7 +296,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
     return (
       <div className="panel-card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <h2 className="panel-title">
-          <Loader2 className="animate-spin" size={24} color="var(--primary)" /> 
+          <Loader2 className="animate-spin" size={24} color="var(--primary)" />
           대본 생성 중 ({currentStep}/3)
         </h2>
         <div style={{
@@ -359,7 +321,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
       {/* 훅 카드 */}
       <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.5rem', backgroundColor: 'var(--secondary)' }}>
         <h3 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          🎣 시선을 끄는 훅 (Hook)
+          Hook & Bridge
         </h3>
         <textarea
           className="form-control"
@@ -369,7 +331,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         />
         {globalScript.bridge !== undefined && (
           <div style={{ marginTop: '1rem' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>브릿지</label>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>Bridge</label>
             <textarea
               className="form-control"
               style={{ minHeight: '60px', lineHeight: '1.6', fontSize: '0.9375rem' }}
@@ -378,10 +340,9 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
             />
           </div>
         )}
-        
         <div style={{ marginTop: '1rem' }}>
           <button onClick={() => setShowHookCot(!showHookCot)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            [CoT 사유 과정 {showHookCot ? '접기 ▲' : '보기 ▼'}]
+            [CoT 사유 과정 {showHookCot ? '접기' : '보기'}]
           </button>
           {showHookCot && (
             <div style={{ marginTop: '0.5rem', padding: '1rem', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', color: 'var(--text-muted)', whiteSpace: 'pre-wrap' }}>
@@ -391,128 +352,94 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         </div>
       </div>
 
-      {/* 오프닝 이미지 프롬프트 */}
-      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.5rem', backgroundColor: '#f0f9ff' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ fontSize: '1.125rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            🎬 오프닝 이미지
-          </h3>
-          <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setShowIntroPrompt(!showIntroPrompt)}>
-            <ImageIcon size={14}/> {showIntroPrompt ? '프롬프트 닫기' : '프롬프트 보기'}
-          </button>
-        </div>
-        {showIntroPrompt && (
-          <div style={{ marginTop: '0.75rem', padding: '0.75rem', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>오프닝 이미지 생성 프롬프트</label>
-              <button onClick={() => copyPrompt(globalScript.intro_image_prompt || '', 'intro')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: copiedId === 'intro' ? '#16a34a' : 'var(--primary)', padding: '0.125rem 0.25rem' }}>
-                {copiedId === 'intro' ? <><Check size={13}/> 복사됨</> : <><Copy size={13}/> 복사</>}
-              </button>
-            </div>
-            <textarea
-              className="form-control"
-              style={{ minHeight: '80px', fontSize: '0.8125rem', lineHeight: '1.5' }}
-              value={globalScript.intro_image_prompt || ''}
-              onChange={(e) => updateState('script', { ...globalScript, intro_image_prompt: e.target.value })}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* 섹션 카드 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <h3 style={{ fontSize: '1.125rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          📝 본문 섹션
+      {/* 대본 + 이미지 프롬프트 + 영상 프롬프트 표 */}
+      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+        <h3 style={{ fontSize: '1.125rem', padding: '1rem 1.5rem', margin: 0, backgroundColor: 'var(--gray-100)', borderBottom: '1px solid var(--border)' }}>
+          대본 / 이미지 프롬프트 / 영상 프롬프트
         </h3>
-        {globalScript.sections?.map((sec, idx) => (
-          <div key={idx} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '1.125rem' }}>{sec.title}</span>
-                <span className="status-badge" style={{ backgroundColor: 'var(--gray-200)' }}>⏱ {sec.duration_sec}초</span>
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setOpenPromptIdx(openPromptIdx === idx ? null : idx)}>
-                  <ImageIcon size={14}/> {openPromptIdx === idx ? '프롬프트 닫기' : '프롬프트 보기'}
-                </button>
-              </div>
-            </div>
-            {openPromptIdx === idx && (
-              <div style={{ marginBottom: '0.75rem', padding: '0.75rem', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>이미지 생성 프롬프트</label>
-                  <button onClick={() => copyPrompt(sec.image_prompt || '', `section_${idx}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: copiedId === `section_${idx}` ? '#16a34a' : 'var(--primary)', padding: '0.125rem 0.25rem' }}>
-                    {copiedId === `section_${idx}` ? <><Check size={13}/> 복사됨</> : <><Copy size={13}/> 복사</>}
-                  </button>
-                </div>
-                <textarea
-                  className="form-control"
-                  style={{ minHeight: '80px', fontSize: '0.8125rem', lineHeight: '1.5' }}
-                  value={sec.image_prompt || ''}
-                  onChange={(e) => updateSectionPrompt(idx, e.target.value)}
-                />
-              </div>
-            )}
-            <textarea
-              className="form-control"
-              style={{ minHeight: '120px', lineHeight: '1.6' }}
-              value={sec.script}
-              onChange={(e) => updateSectionText(idx, e.target.value)}
-            />
-            <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-              <strong>핵심 메시지:</strong> {sec.key_message}
-            </div>
-          </div>
-        ))}
-        {globalScript.cta && (
-          <div style={{ border: '1px dashed var(--primary)', borderRadius: 'var(--radius-md)', padding: '1.5rem', backgroundColor: 'var(--secondary)' }}>
-            <h4 style={{ fontWeight: 700, marginBottom: '0.5rem', color: 'var(--primary)' }}>CTA 및 아웃트로</h4>
-            <textarea
-              className="form-control"
-              style={{ minHeight: '100px', lineHeight: '1.6', marginBottom: '0.75rem' }}
-              value={globalScript.cta.text}
-              onChange={(e) => updateCtaText(e.target.value)}
-            />
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.25rem', display: 'block' }}>📢 전자책 연계</label>
-              <input
-                type="text"
-                className="form-control"
-                style={{ fontSize: '0.875rem' }}
-                value={globalScript.cta.ebook_mention || ''}
-                onChange={(e) => updateCtaEbook(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+            <thead>
+              <tr style={{ backgroundColor: 'var(--gray-100)' }}>
+                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '5%', whiteSpace: 'nowrap' }}>#</th>
+                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '35%' }}>대본</th>
+                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '30%' }}>이미지 프롬프트</th>
+                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '30%' }}>영상 프롬프트</th>
+              </tr>
+            </thead>
+            <tbody>
+              {globalScript.rows?.map((row, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid var(--border)', verticalAlign: 'top' }}>
+                  <td style={{ padding: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>{idx + 1}</td>
+                  <td style={{ padding: '0.5rem' }}>
+                    <textarea
+                      className="form-control"
+                      style={{ minHeight: '80px', fontSize: '0.8125rem', lineHeight: '1.5', border: '1px solid var(--gray-200)' }}
+                      value={row.script}
+                      onChange={(e) => updateRowField(idx, 'script', e.target.value)}
+                    />
+                  </td>
+                  <td style={{ padding: '0.5rem' }}>
+                    <div style={{ position: 'relative' }}>
+                      <textarea
+                        className="form-control"
+                        style={{ minHeight: '80px', fontSize: '0.75rem', lineHeight: '1.4', fontFamily: 'monospace', border: '1px solid var(--gray-200)', paddingRight: '2rem' }}
+                        value={row.image_prompt}
+                        onChange={(e) => updateRowField(idx, 'image_prompt', e.target.value)}
+                      />
+                      <button
+                        onClick={() => copyText(row.image_prompt, `img_${idx}`)}
+                        style={{ position: 'absolute', top: '4px', right: '4px', background: 'none', border: 'none', cursor: 'pointer', color: copiedId === `img_${idx}` ? '#16a34a' : 'var(--text-muted)', padding: '2px' }}
+                        title="복사"
+                      >
+                        {copiedId === `img_${idx}` ? <Check size={12}/> : <Copy size={12}/>}
+                      </button>
+                    </div>
+                  </td>
+                  <td style={{ padding: '0.5rem' }}>
+                    <div style={{ position: 'relative' }}>
+                      <textarea
+                        className="form-control"
+                        style={{ minHeight: '80px', fontSize: '0.75rem', lineHeight: '1.4', fontFamily: 'monospace', border: '1px solid var(--gray-200)', paddingRight: '2rem' }}
+                        value={row.video_prompt}
+                        onChange={(e) => updateRowField(idx, 'video_prompt', e.target.value)}
+                      />
+                      <button
+                        onClick={() => copyText(row.video_prompt, `vid_${idx}`)}
+                        style={{ position: 'absolute', top: '4px', right: '4px', background: 'none', border: 'none', cursor: 'pointer', color: copiedId === `vid_${idx}` ? '#16a34a' : 'var(--text-muted)', padding: '2px' }}
+                        title="복사"
+                      >
+                        {copiedId === `vid_${idx}` ? <Check size={12}/> : <Copy size={12}/>}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* 엔딩 이미지 프롬프트 */}
-      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.5rem', backgroundColor: '#f0f9ff' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ fontSize: '1.125rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            🎬 엔딩 이미지
+      {/* 전체 대본 복사 영역 */}
+      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h3 style={{ fontSize: '1.125rem', margin: 0 }}>
+            전체 대본 (복사용)
           </h3>
-          <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setShowOutroPrompt(!showOutroPrompt)}>
-            <ImageIcon size={14}/> {showOutroPrompt ? '프롬프트 닫기' : '프롬프트 보기'}
+          <button
+            className="btn-primary"
+            style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
+            onClick={() => copyText(getFullScriptText(), 'full_script')}
+          >
+            {copiedId === 'full_script' ? <><Check size={14}/> 복사됨</> : <><Copy size={14}/> 전체 대본 복사</>}
           </button>
         </div>
-        {showOutroPrompt && (
-          <div style={{ marginTop: '0.75rem', padding: '0.75rem', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>엔딩 이미지 생성 프롬프트</label>
-              <button onClick={() => copyPrompt(globalScript.outro_image_prompt || '', 'outro')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: copiedId === 'outro' ? '#16a34a' : 'var(--primary)', padding: '0.125rem 0.25rem' }}>
-                {copiedId === 'outro' ? <><Check size={13}/> 복사됨</> : <><Copy size={13}/> 복사</>}
-              </button>
-            </div>
-            <textarea
-              className="form-control"
-              style={{ minHeight: '80px', fontSize: '0.8125rem', lineHeight: '1.5' }}
-              value={globalScript.outro_image_prompt || ''}
-              onChange={(e) => updateState('script', { ...globalScript, outro_image_prompt: e.target.value })}
-            />
-          </div>
-        )}
+        <div style={{
+          padding: '1rem', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius-md)',
+          whiteSpace: 'pre-wrap', lineHeight: '1.8', fontSize: '0.9375rem', maxHeight: '400px', overflowY: 'auto'
+        }}>
+          {getFullScriptText()}
+        </div>
       </div>
 
       {/* 제목 및 썸네일 추천 */}
@@ -526,8 +453,8 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
             {globalScript.titleSuggestions?.map((t, idx) => {
               const isSelected = globalScript.final_title === t.text;
               return (
-                <div key={idx} onClick={() => selectTitle(t.text)} style={{ 
-                  padding: '1rem', border: `2px solid ${isSelected ? 'var(--primary)' : 'var(--gray-200)'}`, 
+                <div key={idx} onClick={() => selectTitle(t.text)} style={{
+                  padding: '1rem', border: `2px solid ${isSelected ? 'var(--primary)' : 'var(--gray-200)'}`,
                   borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: isSelected ? 'var(--secondary)' : 'transparent'
                 }}>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
@@ -535,7 +462,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
                     <div>
                       <div style={{ fontWeight: isSelected ? 700 : 500 }}>{t.text}</div>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.5rem', fontSize: '0.75rem' }}>
-                        <span className="status-badge success">💯 {t.score}점</span>
+                        <span className="status-badge success">{t.score}점</span>
                         <span style={{ color: 'var(--text-muted)' }}>{t.reason}</span>
                       </div>
                     </div>
@@ -555,8 +482,8 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
             {globalScript.thumbnailCopies?.map((t, idx) => {
               const isSelected = globalScript.final_thumbnail_copy === t.text;
               return (
-                <div key={idx} onClick={() => selectThumbnail(t.text)} style={{ 
-                  padding: '1rem', border: `2px solid ${isSelected ? 'var(--primary)' : 'var(--gray-200)'}`, 
+                <div key={idx} onClick={() => selectThumbnail(t.text)} style={{
+                  padding: '1rem', border: `2px solid ${isSelected ? 'var(--primary)' : 'var(--gray-200)'}`,
                   borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: isSelected ? 'var(--secondary)' : 'transparent'
                 }}>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
@@ -564,7 +491,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
                     <div>
                       <div style={{ fontWeight: isSelected ? 700 : 500, fontSize: '1.125rem' }}>{t.text}</div>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.5rem', fontSize: '0.75rem' }}>
-                        <span className="status-badge success">💯 {t.score}점</span>
+                        <span className="status-badge success">{t.score}점</span>
                         <span style={{ color: 'var(--text-muted)' }}>{t.reason}</span>
                       </div>
                     </div>
@@ -578,7 +505,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
         <button className="btn-primary" onClick={onNext}>
-          확정 후 미디어 생성 <ArrowRight size={20} />
+          확정 후 업로드 단계 <ArrowRight size={20} />
         </button>
       </div>
 
@@ -588,7 +515,6 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
 
 // --- API Helpers ---
 
-// Stream fetching handler matching Anthropic Docs
 async function runClaudeStream(messages, model, _apiKey, onChunk) {
   const systemPrompt = `당신은 jjangsaem.com의 유튜브 콘텐츠 전문가입니다. 피지오 후각 연구소 소속으로 발달장애 아동 및 가족을 위한 뇌과학 근거 중심의 전문적이고 따뜻한 어조로 작성합니다. 반드시 유효한 JSON 형식으로 응답하세요. JSON 앞뒤에 불필요한 텍스트를 넣지 마세요.`;
 
@@ -600,7 +526,7 @@ async function runClaudeStream(messages, model, _apiKey, onChunk) {
     },
     body: JSON.stringify({
       model: model || "claude-haiku-4-5-20251001",
-      max_tokens: 8000,
+      max_tokens: 16000,
       stream: true,
       system: systemPrompt,
       messages: messages
@@ -620,10 +546,10 @@ async function runClaudeStream(messages, model, _apiKey, onChunk) {
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    
+
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split('\n');
-    buffer = lines.pop(); // keep the last incomplete line
+    buffer = lines.pop();
 
     for (const line of lines) {
       if (line.startsWith('data: ')) {
