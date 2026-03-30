@@ -1,107 +1,15 @@
 import React, { useState } from 'react';
-import { ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowRight, Loader2, CheckCircle2, Circle, PlayCircle } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
-
-const SHORTS_TEMPLATES = [
-  {
-    category: '행동 해석 시리즈',
-    color: '#ea580c',
-    items: [
-      { title: '버튼만 계속 누르는 아이… 괜찮을까요?', desc: '혼자 반복 vs 공유 차이' },
-      { title: '이름 불러도 안 돌아보면 위험 신호입니다', desc: '호명 반응' },
-      { title: '눈 안 마주치는 아이, 기다리면 될까요?', desc: '공동주의 설명' },
-      { title: '혼자 노는 아이, 괜찮은 걸까요?', desc: '상호작용 핵심' },
-      { title: '멍한 아이… 사실 freeze입니다', desc: '동결 반응 설명' },
-      { title: '같은 행동인데 왜 결과는 다를까요?', desc: '자폐 vs 정상' },
-      { title: '이 행동, 정상처럼 보이지만 아닙니다', desc: '반복 행동 해석' },
-      { title: '아이 웃는데도 위험 신호일 수 있습니다', desc: '감정 vs 연결' },
-      { title: '말이 늦는 이유, 대부분 이겁니다', desc: '신경계' },
-      { title: '이 3가지만 보면 판단됩니다', desc: '눈맞춤 / 호명 / 공동주의' },
-    ]
-  },
-  {
-    category: '뇌·자율신경 설명 시리즈',
-    color: '#7c3aed',
-    items: [
-      { title: '아이 뇌가 멈추는 이유 (freeze)', desc: '' },
-      { title: '미주신경이 열리면 아이가 바뀝니다', desc: '' },
-      { title: '코막힘이 뇌를 망칩니다', desc: '' },
-      { title: 'meltdown vs shutdown 차이', desc: '' },
-      { title: '왜 어떤 아이는 멍해질까', desc: '' },
-      { title: '아이 문제는 행동이 아닙니다', desc: '' },
-      { title: '발달은 훈련이 아닙니다', desc: '' },
-      { title: '과민 아이의 뇌 상태', desc: '' },
-      { title: '아이 뇌는 항상 위험을 체크합니다', desc: '' },
-      { title: '신경계가 무너지면 생기는 일', desc: '' },
-    ]
-  },
-  {
-    category: '솔루션 시리즈',
-    color: '#059669',
-    items: [
-      { title: '아이 멍할 때 바로 해보세요 (3초 자극)', desc: '' },
-      { title: '귀 마사지 하나로 달라집니다', desc: '' },
-      { title: '코만 바꿔도 아이가 바뀝니다', desc: '' },
-      { title: '잠들기 전 5분 루틴', desc: '' },
-      { title: '아이 진정시키는 방법 (과학적)', desc: '' },
-      { title: '과민 아이 안정시키는 방법', desc: '' },
-      { title: '집중력 올리는 가장 쉬운 방법', desc: '' },
-      { title: '부모가 꼭 해야 하는 1가지', desc: '' },
-      { title: '이걸 바꾸면 발달이 시작됩니다', desc: '' },
-      { title: '아이 뇌를 살리는 습관 3가지', desc: '' },
-    ]
-  }
-];
-
-const SERIES_TEMPLATES = [
-  {
-    series: '시리즈 1: "이 행동, 괜찮은 걸까요?"',
-    color: '#ea580c',
-    items: [
-      { title: '이 행동, 괜찮은 걸까요? — 버튼 반복', ep: '1편' },
-      { title: '이 행동, 괜찮은 걸까요? — 멍함', ep: '2편' },
-      { title: '이 행동, 괜찮은 걸까요? — 눈 안 마주침', ep: '3편' },
-      { title: '이 행동, 괜찮은 걸까요? — 이름 불러도 반응 없음', ep: '4편' },
-    ]
-  },
-  {
-    series: '시리즈 2: "아이 뇌를 바꾸는 5분 루틴"',
-    color: '#7c3aed',
-    items: [
-      { title: '아이 뇌를 바꾸는 5분 루틴 — 귀 마사지', ep: '1편' },
-      { title: '아이 뇌를 바꾸는 5분 루틴 — 코 호흡', ep: '2편' },
-      { title: '아이 뇌를 바꾸는 5분 루틴 — 얼굴 자극', ep: '3편' },
-      { title: '아이 뇌를 바꾸는 5분 루틴 — 수면 루틴', ep: '4편' },
-    ]
-  },
-  {
-    series: '시리즈 3: "부모가 절대 놓치면 안되는 신호 3가지"',
-    color: '#059669',
-    items: [
-      { title: '부모가 절대 놓치면 안되는 신호 — 눈맞춤', ep: '1편' },
-      { title: '부모가 절대 놓치면 안되는 신호 — 호명', ep: '2편' },
-      { title: '부모가 절대 놓치면 안되는 신호 — 공동주의', ep: '3편' },
-    ]
-  }
-];
 
 export default function PlanPanel({ globalState, updateState, onNext }) {
   const data = globalState.plan;
+  const seriesPlan = globalState.seriesPlan;
   const [localFile, setLocalFile] = useState(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isGeneratingSeries, setIsGeneratingSeries] = useState(false);
   const [summaryError, setSummaryError] = useState('');
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [showSeries, setShowSeries] = useState(false);
-
-  const selectTemplate = (item) => {
-    updateState('plan', { ...data, topic: item.title, format: '쇼츠 15~30초' });
-    setShowTemplates(false);
-  };
-
-  const selectSeriesEp = (item) => {
-    updateState('plan', { ...data, topic: item.title, format: '일반 5~10분' });
-    setShowSeries(false);
-  };
+  const [seriesError, setSeriesError] = useState('');
 
   const handleChange = (key, value) => {
     updateState('plan', { ...data, [key]: value });
@@ -119,8 +27,10 @@ export default function PlanPanel({ globalState, updateState, onNext }) {
       const file = e.target.files[0];
       setLocalFile(file);
       handleChange('ebookName', file.name);
-      handleChange('ebookSummary', ''); // Reset summary when new file loaded
+      handleChange('ebookSummary', '');
       setSummaryError('');
+      // Reset series plan when new ebook uploaded
+      updateState('seriesPlan', { ebookName: '', items: [] });
     }
   };
 
@@ -128,39 +38,109 @@ export default function PlanPanel({ globalState, updateState, onNext }) {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let fullText = '';
-    // Extract first 50 pages to save context/time, typically enough for summary
     const maxPages = Math.min(pdf.numPages, 50);
     for (let i = 1; i <= maxPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
-      fullText += textContent.items.map(item => item.str).join(' ') + '\\n';
+      fullText += textContent.items.map(item => item.str).join(' ') + '\n';
     }
     return fullText;
   };
 
-  const summarizePdf = async () => {
+  // Generate series plan from ebook
+  const generateSeriesPlan = async () => {
     if (!localFile) return;
-    if (!data.topic) {
-      setSummaryError('주제를 먼저 상단에 입력해주세요 (주제 맞춤형 요약에 필요합니다).');
-      return;
+
+    setIsGeneratingSeries(true);
+    setSeriesError('');
+
+    try {
+      const pdfText = await extractPdfText(localFile);
+
+      const prompt = `다음은 유튜브 채널 "키즈피지오"에서 홍보할 전자책의 내용입니다.
+이 전자책을 기반으로 유튜브 영상 시리즈를 기획해주세요.
+
+[채널 컨셉]
+"아이 행동을 고치는 채널이 아니라, 아이의 '신경계'를 이해하는 채널"
+차별점: 다른 채널은 행동 설명에 그치지만, 이 채널은 신경계 설명 + 해결까지 제시
+
+[목표]
+- 영상을 통해 전자책 내용의 가치를 보여주고, 전자책 구매로 이어지도록 유도
+- 각 영상은 전자책의 핵심 내용 일부를 다루되, 전체를 알려면 전자책을 봐야 하도록 구성
+
+[요청]
+전자책 내용을 분석하여:
+1. 롱폼 영상 (5~10분) 주제 5~6개 — 전자책 핵심 챕터/테마별로
+2. 쇼츠 (15~30초) 주제 8~10개 — 전자책에서 뽑은 짧은 포인트들
+
+각 주제는 유튜브에서 클릭을 유발하는 제목 형태로 작성해주세요.
+
+[전자책 내용]
+${pdfText.substring(0, 40000)}
+
+JSON으로 출력:
+{
+  "items": [
+    { "title": "영상 제목", "format": "일반 5~10분", "desc": "이 영상에서 다룰 핵심 내용 1줄 요약" },
+    { "title": "쇼츠 제목", "format": "쇼츠 15~30초", "desc": "핵심 포인트 1줄" }
+  ]
+}
+JSON만 출력.`;
+
+      const res = await fetch('/api/anthropic/v1/messages', {
+        method: 'POST',
+        headers: {
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: data.model || "claude-haiku-4-5-20251001",
+          max_tokens: 4000,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+
+      if (!res.ok) throw new Error('시리즈 생성 API 호출 실패');
+      const apiData = await res.json();
+      const text = apiData.content[0].text;
+
+      // Parse JSON
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('JSON 파싱 실패');
+      const parsed = JSON.parse(match[0]);
+
+      const items = (parsed.items || []).map(item => ({
+        ...item,
+        status: 'pending' // pending | current | completed
+      }));
+
+      updateState('seriesPlan', { ebookName: data.ebookName, items });
+
+    } catch (err) {
+      console.error(err);
+      setSeriesError('시리즈 생성 중 오류: ' + err.message);
+    } finally {
+      setIsGeneratingSeries(false);
     }
+  };
+
+  // Summarize ebook for current topic
+  const summarizeForTopic = async (topic) => {
+    if (!localFile) return;
 
     setIsSummarizing(true);
     setSummaryError('');
 
     try {
-      // 1. Extract text from PDF
       const pdfText = await extractPdfText(localFile);
 
-      // 2. Summarize using Claude Haiku (Fast & Cheap)
       const prompt = `다음은 사용자가 업로드한 전자책 PDF의 본문 텍스트(일부)입니다.
-현재 기획 중인 유튜브 영상의 주제는 [${data.topic}] 입니다.
+현재 기획 중인 유튜브 영상의 주제는 [${topic}] 입니다.
 이 주제와 관련된 내용을 중심으로, PDF의 핵심 노하우와 주요 목차를 요약해주세요. (이 요약본은 이후 대본 작성 프롬프트로 전달됩니다.)
 텍스트가 너무 길면 핵심 위주로 1000자 이내로 압축해주세요.
 
 [PDF 텍스트]
-${pdfText.substring(0, 50000)} // 최대 약 5만자로 제한
-`;
+${pdfText.substring(0, 50000)}`;
 
       const res = await fetch('/api/anthropic/v1/messages', {
         method: 'POST',
@@ -177,111 +157,172 @@ ${pdfText.substring(0, 50000)} // 최대 약 5만자로 제한
 
       if (!res.ok) throw new Error('Claude 요약 API 호출 실패');
       const apiData = await res.json();
-      const summary = apiData.content[0].text;
-
-      handleChange('ebookSummary', summary);
+      handleChange('ebookSummary', apiData.content[0].text);
     } catch (err) {
       console.error(err);
-      setSummaryError('요약 중 오류가 발생했습니다: ' + err.message);
+      setSummaryError('요약 중 오류: ' + err.message);
     } finally {
       setIsSummarizing(false);
     }
   };
 
+  // Select a series item as current topic
+  const selectSeriesItem = (idx) => {
+    const item = seriesPlan.items[idx];
+    // Mark previous current as pending (if not completed)
+    const newItems = seriesPlan.items.map((it, i) => {
+      if (it.status === 'current') return { ...it, status: 'pending' };
+      if (i === idx) return { ...it, status: 'current' };
+      return it;
+    });
+    updateState('seriesPlan', { ...seriesPlan, items: newItems });
+    updateState('plan', { ...data, topic: item.title, format: item.format });
+
+    // Auto-summarize for this topic
+    if (localFile) {
+      summarizeForTopic(item.title);
+    }
+  };
+
+  const hasSeries = seriesPlan.items.length > 0;
+  const longformItems = seriesPlan.items.filter(it => it.format === '일반 5~10분');
+  const shortsItems = seriesPlan.items.filter(it => it.format.startsWith('쇼츠'));
+  const completedCount = seriesPlan.items.filter(it => it.status === 'completed').length;
+
   return (
     <div className="panel-card">
       <h2 className="panel-title">기획 설정</h2>
 
-      {/* 쇼츠 템플릿 */}
-      <div className="form-group" style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--gray-100)' }}>
-        <button
-          onClick={() => setShowTemplates(!showTemplates)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.9375rem', color: 'var(--primary)', padding: 0, width: '100%' }}
-        >
-          {showTemplates ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}
-          쇼츠 템플릿에서 시작 (30개)
-        </button>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-          검증된 쇼츠 주제를 선택하면 주제와 포맷이 자동 설정됩니다.
+      {/* Step 1: Ebook Upload */}
+      <div className="form-group" style={{ padding: '1.25rem', border: '2px solid var(--primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--secondary)' }}>
+        <label className="form-label" style={{ color: 'var(--primary)', fontSize: '1rem' }}>1. 전자책 PDF 업로드</label>
+        <p style={{ fontSize: '0.875rem', marginBottom: '0.75rem', color: 'var(--text-muted)' }}>
+          전자책을 업로드하면 AI가 내용을 분석하여 영상 시리즈를 자동 기획합니다.
         </p>
-        {showTemplates && (
-          <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {SHORTS_TEMPLATES.map((cat) => (
-              <div key={cat.category}>
-                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: cat.color, marginBottom: '0.5rem' }}>{cat.category}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  {cat.items.map((item, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => selectTemplate(item)}
-                      style={{
-                        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-                        padding: '0.5rem 0.75rem', cursor: 'pointer', textAlign: 'left', fontSize: '0.8125rem',
-                        transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '0.5rem'
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = cat.color; e.currentTarget.style.backgroundColor = cat.color + '10'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
-                    >
-                      <span style={{ fontWeight: 500 }}>{item.title}</span>
-                      {item.desc && <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>— {item.desc}</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
+        <input
+          type="file"
+          accept="application/pdf"
+          className="form-control"
+          onChange={handleFileChange}
+        />
+        {data.ebookName && (
+          <div style={{ marginTop: '0.75rem', fontSize: '0.875rem', fontWeight: 600 }}>
+            업로드된 파일: {data.ebookName}
           </div>
         )}
-      </div>
 
-      {/* 일반 영상 시리즈 템플릿 */}
-      <div className="form-group" style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--gray-100)' }}>
-        <button
-          onClick={() => setShowSeries(!showSeries)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.9375rem', color: 'var(--primary)', padding: 0, width: '100%' }}
-        >
-          {showSeries ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}
-          일반 영상 시리즈 템플릿 (3개 시리즈, {SERIES_TEMPLATES.reduce((sum, s) => sum + s.items.length, 0)}편)
-        </button>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-          시리즈 에피소드를 선택하면 주제와 포맷(일반 5~10분)이 자동 설정됩니다.
-        </p>
-        {showSeries && (
-          <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {SERIES_TEMPLATES.map((ser) => (
-              <div key={ser.series}>
-                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: ser.color, marginBottom: '0.5rem' }}>{ser.series}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  {ser.items.map((item, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => selectSeriesEp(item)}
-                      style={{
-                        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-                        padding: '0.5rem 0.75rem', cursor: 'pointer', textAlign: 'left', fontSize: '0.8125rem',
-                        transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '0.5rem'
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = ser.color; e.currentTarget.style.backgroundColor = ser.color + '10'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
-                    >
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: ser.color, backgroundColor: ser.color + '15', padding: '0.1rem 0.4rem', borderRadius: '3px' }}>{item.ep}</span>
-                      <span style={{ fontWeight: 500 }}>{item.title}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+        <div style={{ marginTop: '0.75rem' }}>
+          <label className="form-label" style={{ fontSize: '0.875rem', color: 'var(--primary)' }}>전자책 구매 페이지 URL</label>
+          <input
+            type="url"
+            className="form-control"
+            value={data.ebookUrl || ''}
+            onChange={(e) => handleChange('ebookUrl', e.target.value)}
+            placeholder="예: https://jjangsaem.com/ebook/sensory-sleep"
+          />
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+            유튜브 디스크립션에 전자책 링크로 삽입됩니다.
+          </p>
+        </div>
+
+        {/* Series Generation Button */}
+        {data.ebookName && !hasSeries && (
+          <button
+            className="btn-primary"
+            style={{ marginTop: '1rem', width: '100%', padding: '0.75rem', fontSize: '1rem' }}
+            onClick={generateSeriesPlan}
+            disabled={isGeneratingSeries}
+          >
+            {isGeneratingSeries ? (
+              <><Loader2 className="animate-spin" size={18} /> 전자책 분석 및 시리즈 기획 중...</>
+            ) : (
+              '전자책 분석하여 영상 시리즈 기획하기'
+            )}
+          </button>
         )}
+        {seriesError && <div style={{ color: 'red', fontSize: '0.875rem', marginTop: '0.5rem' }}>{seriesError}</div>}
       </div>
 
+      {/* Step 2: Series Plan */}
+      {hasSeries && (
+        <div className="form-group" style={{ padding: '1.25rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <label className="form-label" style={{ margin: 0, fontSize: '1rem' }}>2. 영상 시리즈 ({completedCount}/{seriesPlan.items.length} 완료)</label>
+            <button
+              className="btn-secondary"
+              style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
+              onClick={generateSeriesPlan}
+              disabled={isGeneratingSeries}
+            >
+              {isGeneratingSeries ? <Loader2 className="animate-spin" size={14} /> : '시리즈 재생성'}
+            </button>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ height: '6px', backgroundColor: 'var(--gray-200)', borderRadius: '3px', marginBottom: '1.25rem', overflow: 'hidden' }}>
+            <div style={{ width: `${(completedCount / seriesPlan.items.length) * 100}%`, height: '100%', backgroundColor: '#22c55e', transition: 'width 0.3s' }} />
+          </div>
+
+          {/* Longform */}
+          {longformItems.length > 0 && (
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#7c3aed', marginBottom: '0.5rem' }}>
+                롱폼 영상 (5~10분) — {longformItems.length}개
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                {longformItems.map((item) => {
+                  const globalIdx = seriesPlan.items.indexOf(item);
+                  return (
+                    <SeriesItem key={globalIdx} item={item} idx={globalIdx} onSelect={selectSeriesItem} />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Shorts */}
+          {shortsItems.length > 0 && (
+            <div>
+              <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#ea580c', marginBottom: '0.5rem' }}>
+                쇼츠 (15~30초) — {shortsItems.length}개
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                {shortsItems.map((item) => {
+                  const globalIdx = seriesPlan.items.indexOf(item);
+                  return (
+                    <SeriesItem key={globalIdx} item={item} idx={globalIdx} onSelect={selectSeriesItem} />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Step 3: Topic (auto-filled or manual) */}
       <div className="form-group">
-        <label className="form-label">주제 입력</label>
+        <label className="form-label">{hasSeries ? '3. 현재 영상 주제' : '주제 입력'}</label>
         <textarea
           className="form-control"
           value={data.topic}
           onChange={(e) => handleChange('topic', e.target.value)}
-          placeholder="예: 터미타임 거부하는 아이 대처법"
+          placeholder={hasSeries ? '위 시리즈에서 선택하거나 직접 입력하세요' : '예: 터미타임 거부하는 아이 대처법'}
         />
+        {/* Ebook summary for current topic */}
+        {data.ebookSummary && (
+          <div style={{ marginTop: '0.5rem', padding: '0.75rem', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius-sm)', fontSize: '0.8125rem' }}>
+            <div style={{ color: '#16a34a', fontWeight: 600, marginBottom: '0.25rem' }}>전자책 요약 (대본 생성에 자동 전달)</div>
+            <div style={{ whiteSpace: 'pre-wrap', maxHeight: '120px', overflowY: 'auto', color: 'var(--text-muted)' }}>
+              {data.ebookSummary}
+            </div>
+          </div>
+        )}
+        {isSummarizing && (
+          <div style={{ marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Loader2 className="animate-spin" size={14} /> 이 주제에 맞게 전자책 요약 중...
+          </div>
+        )}
+        {summaryError && <div style={{ color: 'red', fontSize: '0.875rem', marginTop: '0.5rem' }}>{summaryError}</div>}
       </div>
 
       <div className="form-group">
@@ -306,55 +347,6 @@ ${pdfText.substring(0, 50000)} // 최대 약 5만자로 제한
             </label>
           ))}
         </div>
-      </div>
-
-      <div className="form-group" style={{ padding: '1rem', border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--secondary)' }}>
-        <label className="form-label" style={{ color: 'var(--primary)' }}>연계 전자책 (PDF 업로드 및 자동 요약)</label>
-        <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
-          선택한 주제를 바탕으로 PDF 내용을 자동 요약하여 대본 생성 시 AI에게 핵심 노하우를 전달합니다.
-        </p>
-        <input
-          type="file"
-          accept="application/pdf"
-          className="form-control"
-          onChange={handleFileChange}
-        />
-        <div style={{ marginTop: '0.75rem' }}>
-          <label className="form-label" style={{ fontSize: '0.875rem', color: 'var(--primary)' }}>전자책 구매 페이지 URL</label>
-          <input
-            type="url"
-            className="form-control"
-            value={data.ebookUrl || ''}
-            onChange={(e) => handleChange('ebookUrl', e.target.value)}
-            placeholder="예: https://jjangsaem.com/ebook/tummy-time-guide"
-          />
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-            유튜브 디스크립션에 전자책 링크로 삽입됩니다.
-          </p>
-        </div>
-        {data.ebookName && (
-           <div style={{ marginTop: '1rem' }}>
-             <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>업로드된 파일: {data.ebookName}</div>
-             {!data.ebookSummary ? (
-               <button
-                 className="btn-primary"
-                 style={{ marginTop: '0.5rem', fontSize: '0.875rem', padding: '0.5rem 1rem' }}
-                 onClick={summarizePdf}
-                 disabled={isSummarizing}
-               >
-                 {isSummarizing ? 'PDF 분석 및 요약 중...' : '이 책을 요약하여 대본 정보로 연동하기'}
-               </button>
-             ) : (
-               <div style={{ marginTop: '0.5rem', padding: '1rem', backgroundColor: 'var(--surface)', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '0.875rem' }}>
-                 <div style={{ color: 'green', fontWeight: 600, marginBottom: '0.5rem' }}>요약 완료 (이 내용이 백그라운드에서 전달됩니다)</div>
-                 <div style={{ whiteSpace: 'pre-wrap', maxHeight: '150px', overflowY: 'auto', color: 'var(--text-muted)' }}>
-                   {data.ebookSummary}
-                 </div>
-               </div>
-             )}
-             {summaryError && <div style={{ color: 'red', fontSize: '0.875rem', marginTop: '0.5rem' }}>{summaryError}</div>}
-           </div>
-        )}
       </div>
 
       <div className="form-group" style={{ padding: '1rem', border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--secondary)' }}>
@@ -425,5 +417,36 @@ ${pdfText.substring(0, 50000)} // 최대 약 5만자로 제한
         </button>
       </div>
     </div>
+  );
+}
+
+// Series item component
+function SeriesItem({ item, idx, onSelect }) {
+  const statusStyles = {
+    completed: { icon: <CheckCircle2 size={16} color="#22c55e" />, bg: '#f0fdf4', border: '#bbf7d0', badge: '완료', badgeColor: '#16a34a' },
+    current: { icon: <PlayCircle size={16} color="var(--primary)" />, bg: 'var(--secondary)', border: 'var(--primary)', badge: '제작 중', badgeColor: 'var(--primary)' },
+    pending: { icon: <Circle size={16} color="var(--gray-300)" />, bg: 'var(--surface)', border: 'var(--border)', badge: '예정', badgeColor: 'var(--text-muted)' },
+  };
+  const s = statusStyles[item.status] || statusStyles.pending;
+
+  return (
+    <button
+      onClick={() => item.status !== 'completed' && onSelect(idx)}
+      style={{
+        background: s.bg, border: `1px solid ${s.border}`, borderRadius: 'var(--radius-sm)',
+        padding: '0.5rem 0.75rem', cursor: item.status === 'completed' ? 'default' : 'pointer',
+        textAlign: 'left', fontSize: '0.8125rem', transition: 'all 0.15s',
+        display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: item.status === 'completed' ? 0.7 : 1
+      }}
+    >
+      {s.icon}
+      <span style={{ flex: 1, fontWeight: item.status === 'current' ? 600 : 400, textDecoration: item.status === 'completed' ? 'line-through' : 'none' }}>
+        {item.title}
+      </span>
+      {item.desc && <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.desc}</span>}
+      <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: s.badgeColor, backgroundColor: s.badgeColor + '15', padding: '0.1rem 0.4rem', borderRadius: '3px', whiteSpace: 'nowrap' }}>
+        {s.badge}
+      </span>
+    </button>
   );
 }

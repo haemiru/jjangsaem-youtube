@@ -37,7 +37,8 @@ const INIT_STATE = {
   script: { hook: '', empathy: '', twist: '', sections: [], cta: '', titleSuggestions: [], thumbnailCopies: [] },
   media: { selectedThumbnailCopy: '', imagePrompts: [], generatedImages: [], selectedThumbnail: '' },
   metadata: { title: '', description: '', tags: [], hashtags: [], cotLog: '' },
-  upload: { scheduleType: '', scheduledAt: '', visibility: '', uploadStatus: '' }
+  upload: { scheduleType: '', scheduledAt: '', visibility: '', uploadStatus: '' },
+  seriesPlan: { ebookName: '', items: [] }
 };
 
 // --- Context ---
@@ -114,7 +115,7 @@ export default function App() {
             <MediaPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('upload')} disabled={true} />
           </div>
           <div style={{ display: activeTab === 'upload' ? 'block' : 'none' }}>
-            <UploadPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('dashboard')} />
+            <UploadPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('dashboard')} setActiveTab={setActiveTab} />
           </div>
           <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
             <DashboardPanel globalState={globalState} onNavigate={setActiveTab} />

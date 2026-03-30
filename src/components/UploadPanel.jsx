@@ -5,8 +5,8 @@ import { requestAccessToken, verifyToken, fetchPlaylists, uploadVideo, setThumbn
 // Hidden import for Play icon workaround
 const Play = PlaySquare;
 
-export default function UploadPanel({ globalState, updateState, onNext }) {
-  const { plan, benchmark, script, media, metadata, upload } = globalState;
+export default function UploadPanel({ globalState, updateState, onNext, setActiveTab }) {
+  const { plan, benchmark, script, media, metadata, upload, seriesPlan } = globalState;
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -535,11 +535,76 @@ JSON만 출력.`;
           </div>
 
           {uploadStatus.videoId && (
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-              <a href={`https://studio.youtube.com/video/${uploadStatus.videoId}/edit`} target="_blank" rel="noreferrer" className="btn-secondary" style={{ flex: 1, textDecoration: 'none', textAlign: 'center' }}>YouTube Studio 열기</a>
-              <a href={`https://youtube.com/watch?v=${uploadStatus.videoId}`} target="_blank" rel="noreferrer" className="btn-secondary" style={{ flex: 1, textDecoration: 'none', textAlign: 'center' }}>영상 보기</a>
-              <button className="btn-primary" style={{ flex: 1 }} onClick={onNext}>대시보드로 이동</button>
-            </div>
+            <>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                <a href={`https://studio.youtube.com/video/${uploadStatus.videoId}/edit`} target="_blank" rel="noreferrer" className="btn-secondary" style={{ flex: 1, textDecoration: 'none', textAlign: 'center' }}>YouTube Studio 열기</a>
+                <a href={`https://youtube.com/watch?v=${uploadStatus.videoId}`} target="_blank" rel="noreferrer" className="btn-secondary" style={{ flex: 1, textDecoration: 'none', textAlign: 'center' }}>영상 보기</a>
+                <button className="btn-primary" style={{ flex: 1 }} onClick={onNext}>대시보드로 이동</button>
+              </div>
+
+              {/* Next video in series */}
+              {(() => {
+                const currentIdx = seriesPlan.items.findIndex(it => it.status === 'current');
+                const nextItem = seriesPlan.items.find((it, i) => i > currentIdx && it.status === 'pending');
+                const completedCount = seriesPlan.items.filter(it => it.status === 'completed').length;
+
+                if (seriesPlan.items.length === 0) return null;
+
+                const handleContinue = () => {
+                  // Mark current as completed
+                  const newItems = seriesPlan.items.map(it => {
+                    if (it.status === 'current') return { ...it, status: 'completed' };
+                    return it;
+                  });
+                  // Mark next as current
+                  if (nextItem) {
+                    const nextIdx = seriesPlan.items.indexOf(nextItem);
+                    newItems[nextIdx] = { ...newItems[nextIdx], status: 'current' };
+                  }
+                  updateState('seriesPlan', { ...seriesPlan, items: newItems });
+
+                  if (nextItem) {
+                    // Reset script/benchmark/metadata/upload for next video
+                    updateState('plan', { ...plan, topic: nextItem.title, format: nextItem.format });
+                    updateState('script', { hook: '', empathy: '', twist: '', sections: [], cta: '', titleSuggestions: [], thumbnailCopies: [] });
+                    updateState('benchmark', { channels: [], thumbnailPatterns: [], titleFormulas: [], tagPool: [] });
+                    updateState('metadata', { title: '', description: '', tags: [], hashtags: [], cotLog: '' });
+                    updateState('upload', { scheduleType: '', scheduledAt: '', visibility: '', uploadStatus: '' });
+                  }
+                  setActiveTab('plan');
+                };
+
+                return (
+                  <div style={{ marginTop: '1.5rem', padding: '1.25rem', backgroundColor: '#eff6ff', border: '2px solid #3b82f6', borderRadius: 'var(--radius-md)' }}>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1d4ed8', marginBottom: '0.75rem' }}>
+                      시리즈 진행 현황: {completedCount + 1}/{seriesPlan.items.length} 완료
+                    </div>
+                    {nextItem ? (
+                      <>
+                        <div style={{ fontSize: '0.9375rem', marginBottom: '1rem' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>다음 영상:</span>{' '}
+                          <span style={{ fontWeight: 600 }}>{nextItem.title}</span>
+                          <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: nextItem.format.startsWith('쇼츠') ? '#ea580c' : '#7c3aed', backgroundColor: nextItem.format.startsWith('쇼츠') ? '#ea580c15' : '#7c3aed15', padding: '0.1rem 0.4rem', borderRadius: '3px' }}>
+                            {nextItem.format}
+                          </span>
+                        </div>
+                        <button
+                          className="btn-primary"
+                          style={{ width: '100%', padding: '0.75rem', fontSize: '1rem' }}
+                          onClick={handleContinue}
+                        >
+                          다음 영상 제작 시작하기
+                        </button>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#16a34a', textAlign: 'center', padding: '0.5rem' }}>
+                        모든 시리즈 영상 제작이 완료되었습니다!
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </>
           )}
         </div>
       )}
