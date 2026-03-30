@@ -73,7 +73,7 @@ export default function App() {
         <header className="header">
           <div className="header-logo" onClick={() => setActiveTab('plan')} style={{ cursor: 'pointer' }}>
             <PlaySquare color="var(--primary)" size={28} />
-            <span>JjangSaem YouTube Auto</span>
+            <span>JjangSaem YouTube</span>
           </div>
         </header>
 
