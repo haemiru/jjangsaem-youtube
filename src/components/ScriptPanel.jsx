@@ -173,14 +173,15 @@ JSON만 출력.`;
       setStreamText(prev => prev + '\n\n=== [2/3] 문장 단위 대본 + 이미지/영상 프롬프트 생성 중 ===\n\n');
 
       // Format-specific length guide (Google TTS 기준: 한국어 약 250자 = 1분)
+      // Claude가 목표보다 짧게 쓰는 경향이 있어 넉넉하게 설정
       const lengthGuide = (() => {
         const f = plan.format;
-        if (f === '쇼츠 15~30초') return { rows: '4~8', chars: '100~120', time: '15~30초' };
-        if (f === '쇼츠 60초') return { rows: '8~14', chars: '200~250', time: '50~60초' };
-        if (f === '일반 4~5분') return { rows: '25~35', chars: '1000~1250', time: '4~5분' };
-        if (f === '일반 8~10분') return { rows: '45~60', chars: '2000~2500', time: '8~10분' };
-        if (f === '일반 10분 이상') return { rows: '60~80', chars: '2500~3500', time: '10분 이상' };
-        return { rows: '25~40', chars: '1000~2000', time: '5~10분' };
+        if (f === '쇼츠 15~30초') return { rows: '4~8', chars: '150~250', time: '15~30초' };
+        if (f === '쇼츠 60초') return { rows: '8~14', chars: '350~500', time: '50~60초' };
+        if (f === '일반 4~5분') return { rows: '30~40', chars: '1500~2000', time: '4~5분' };
+        if (f === '일반 8~10분') return { rows: '50~70', chars: '3000~4000', time: '8~10분' };
+        if (f === '일반 10분 이상') return { rows: '70~90', chars: '4000~5500', time: '10분 이상' };
+        return { rows: '30~50', chars: '2000~3000', time: '5~10분' };
       })();
 
       const structureGuide = isShorts
