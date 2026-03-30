@@ -172,15 +172,15 @@ JSON만 출력.`;
       setCurrentStep(2);
       setStreamText(prev => prev + '\n\n=== [2/3] 문장 단위 대본 + 이미지/영상 프롬프트 생성 중 ===\n\n');
 
-      // Format-specific length guide
+      // Format-specific length guide (Google TTS 기준: 한국어 약 250자 = 1분)
       const lengthGuide = (() => {
         const f = plan.format;
-        if (f === '쇼츠 15~30초') return { rows: '4~6', chars: '150~300', time: '15~30초' };
-        if (f === '쇼츠 60초') return { rows: '8~12', chars: '400~600', time: '50~60초' };
-        if (f === '일반 4~5분') return { rows: '20~30', chars: '2000~2500', time: '4~5분' };
-        if (f === '일반 8~10분') return { rows: '35~50', chars: '4000~5000', time: '8~10분' };
-        if (f === '일반 10분 이상') return { rows: '50~70', chars: '5000~7000', time: '10분 이상' };
-        return { rows: '20~35', chars: '2000~4000', time: '5~10분' };
+        if (f === '쇼츠 15~30초') return { rows: '4~8', chars: '100~120', time: '15~30초' };
+        if (f === '쇼츠 60초') return { rows: '8~14', chars: '200~250', time: '50~60초' };
+        if (f === '일반 4~5분') return { rows: '25~35', chars: '1000~1250', time: '4~5분' };
+        if (f === '일반 8~10분') return { rows: '45~60', chars: '2000~2500', time: '8~10분' };
+        if (f === '일반 10분 이상') return { rows: '60~80', chars: '2500~3500', time: '10분 이상' };
+        return { rows: '25~40', chars: '1000~2000', time: '5~10분' };
       })();
 
       const structureGuide = isShorts
@@ -226,7 +226,8 @@ ${structureGuide}
 - 목표 영상 길이: ${lengthGuide.time}
 - row 수: ${lengthGuide.rows}개
 - 전체 대본 총 글자 수: ${lengthGuide.chars}자
-- 한국어 TTS 기준 약 350자 = 1분 분량입니다. 이 기준에 맞춰 분량을 조절하세요.
+- Google TTS 한국어 기준 약 250자 = 1분입니다. 이 기준에 맞춰 분량을 조절하세요.
+- 반드시 총 글자 수 기준을 지켜주세요. 너무 짧으면 안 됩니다.
 
 [스타일 가이드]
 - 이 영상은 특정 캐릭터를 활용한 화이트보드 애니메이션 스타일입니다.
@@ -242,12 +243,12 @@ ${structureGuide}
 [출력 규칙]
 1. 대본을 1~2문장 단위로 끊어서 rows 배열에 넣어줘 (총 ${lengthGuide.rows}개 row)
 2. 각 row에 section 필드를 반드시 포함 — 값은 ${isShorts ? '"hook", "explain", "core", "cta"' : '"hook", "empathy", "twist", "core", "solution", "cta"'} 중 하나
-3. 각 row의 image_prompt: 해당 문장을 시각화하는 이미지 프롬프트 (한국어)
-   - 반드시 "흰색 배경" 포함
+3. 각 row의 image_prompt: 해당 문장을 시각화하는 이미지 생성 프롬프트 (영어로 작성)
+   - 반드시 "white background" 포함
    - 캐릭터가 등장하며 해당 내용을 설명하는 포즈/표정
-   - 이미지 안에 표시되는 텍스트는 한글로 작성 (예: "'수면 훈련'이라고 적힌 텍스트" 형태로)
+   - 이미지 안에 표시할 텍스트는 한글을 그대로 포함 (예: text reading "수면 훈련")
    - 이미지 안의 텍스트는 화면 상단~중앙(위쪽 70%)에 배치 — 하단 30%는 영상 자막이 들어가므로 텍스트가 겹치지 않도록 할 것
-4. 각 row의 video_prompt: 해당 이미지를 5초 영상으로 만들기 위한 Grok 영상 생성 프롬프트 (한국어)
+4. 각 row의 video_prompt: 해당 이미지를 5초 영상으로 만들기 위한 영상 생성 프롬프트 (영어로 작성)
    - 카메라 움직임, 캐릭터 애니메이션, 텍스트 등장 효과 등 포함
 
 JSON 출력:
@@ -256,8 +257,8 @@ JSON 출력:
     {
       "section": "hook",
       "script": "대본 문장 (한국어)",
-      "image_prompt": "흰색 배경, 캐릭터가 ... 포즈로 서 있고 ... (한국어)",
-      "video_prompt": "카메라가 천천히 캐릭터를 줌인하며 ... (한국어)"
+      "image_prompt": "White background, character standing in ... pose ... (영어)",
+      "video_prompt": "Camera slowly zooms in on character ... (영어)"
     }
   ],
   "full_script": "전체 대본을 이어붙인 텍스트 (복사용)"
@@ -601,6 +602,35 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
           </table>
         </div>
       </div>
+
+      {/* TTS Style Instructions */}
+      {(() => {
+        const ttsStyles = {
+          '따뜻한': 'Speak in a warm, gentle, and empathetic tone, like a caring mother talking to worried parents. Soft and reassuring voice, moderate pace, with natural emotional pauses.',
+          '전문적': 'Speak in a calm, confident, and authoritative tone, like a pediatric neurologist explaining to parents. Clear articulation, steady pace, professional but approachable.',
+          '교육적': 'Speak in a friendly and clear instructional tone, like a kind teacher explaining step by step. Bright and encouraging voice, slightly slower pace for clarity.'
+        };
+        const styleText = ttsStyles[plan.tone] || ttsStyles['전문적'];
+        return (
+          <div style={{ border: '1px solid #3b82f6', borderRadius: 'var(--radius-md)', padding: '1.25rem', backgroundColor: '#eff6ff' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h3 style={{ fontSize: '1rem', margin: 0, color: '#1d4ed8' }}>
+                Google TTS Style Instructions ({plan.tone})
+              </h3>
+              <button
+                className="btn-primary"
+                style={{ fontSize: '0.8125rem', padding: '0.375rem 0.75rem' }}
+                onClick={() => copyText(styleText, 'tts_style')}
+              >
+                {copiedId === 'tts_style' ? <><Check size={14}/> 복사됨</> : <><Copy size={14}/> 복사</>}
+              </button>
+            </div>
+            <div style={{ padding: '0.75rem', backgroundColor: 'white', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem', fontFamily: 'monospace', lineHeight: '1.6', color: '#374151' }}>
+              {styleText}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 전체 대본 복사 영역 */}
       <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.5rem' }}>
