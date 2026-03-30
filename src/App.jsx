@@ -28,8 +28,9 @@ const TABS = [
   { id: 'dashboard', label: '대시보드', icon: BarChart2 },
 ];
 
-// Setup PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+// Setup PDF.js worker (use local bundled worker instead of CDN)
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const INIT_STATE = {
   plan: { topic: '', format: '쇼츠 60초', targets: [], ebookName: '', ebookSummary: '', ebookUrl: '', tone: '전문적', model: 'claude-opus-4-6', characterImage: '', characterDescription: '' },
