@@ -2,6 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { UploadCloud, CheckCircle2, ChevronDown, ChevronUp, Tag, Youtube, Calendar, X, PlaySquare, FileText, Loader2, ArrowRight, LogIn, Film, AlertCircle, RefreshCw } from 'lucide-react';
 import { requestAccessToken, verifyToken, fetchPlaylists, uploadVideo, setThumbnail } from '../services/youtubeService';
 
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    const res = await fetch(url, options);
+    if (res.ok) return res;
+    if (res.status === 429 && i < maxRetries - 1) {
+      const wait = (i + 1) * 5000;
+      await new Promise(r => setTimeout(r, wait));
+      continue;
+    }
+    throw new Error(`API 요청 실패 (${res.status})`);
+  }
+}
+
 // Hidden import for Play icon workaround
 const Play = PlaySquare;
 
@@ -130,7 +143,7 @@ export default function UploadPanel({ globalState, updateState, onNext, setActiv
 }
 JSON만 출력.`;
 
-      const res = await fetch('/api/anthropic/v1/messages', {
+      const res = await fetchWithRetry('/api/anthropic/v1/messages', {
         method: 'POST',
         headers: {
           'anthropic-version': '2023-06-01',

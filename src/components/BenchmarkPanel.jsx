@@ -248,8 +248,22 @@ export default function BenchmarkPanel({ globalState, updateState, onNext }) {
 
 // --- API Helpers ---
 
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    const res = await fetch(url, options);
+    if (res.ok) return res;
+    if (res.status === 429 && i < maxRetries - 1) {
+      const wait = (i + 1) * 5000; // 5s, 10s, 15s
+      console.log(`429 rate limit, retrying in ${wait / 1000}s...`);
+      await new Promise(r => setTimeout(r, wait));
+      continue;
+    }
+    throw new Error(`API 요청 실패 (${res.status})`);
+  }
+}
+
 async function fetchKeywords(topic) {
-  const res = await fetch('/api/anthropic/v1/messages', {
+  const res = await fetchWithRetry('/api/anthropic/v1/messages', {
     method: 'POST',
     headers: {
       'anthropic-version': '2023-06-01',
@@ -273,7 +287,6 @@ async function fetchKeywords(topic) {
       }]
     })
   });
-  if (!res.ok) throw new Error('Claude API 요청 실패 (키워드)');
   const data = await res.json();
   const text = data.content[0].text;
   const match = text.match(/\[(.*)\]/s);
@@ -418,7 +431,7 @@ async function analyzeThumbnails(thumbnails) {
       text: "이 유튜브 썸네일들을 분석해서 다음을 JSON으로 출력해줘.\n분석 항목:\n1. dominantColors: 가장 많이 쓰인 색상 조합 top3 (헥스코드 배열)\n2. textPattern: 텍스트 글자수 범위, 위치(상/중/하), 폰트 굵기를 포함한 문자열 요약\n3. emotionType: 등장 인물 표정 유형 (공감/놀람/걱정/희망/없음) 비율\n4. layoutType: 인물중심/텍스트중심/인포그래픽 비율\n5. commonWords: 텍스트에서 자주 등장한 단어 top10 배열\nJSON 형식으로만 출력, 다른 텍스트 없이."
     });
 
-    const res = await fetch('/api/anthropic/v1/messages', {
+    const res = await fetchWithRetry('/api/anthropic/v1/messages', {
       method: 'POST',
       headers: {
         'anthropic-version': '2023-06-01',
@@ -450,7 +463,7 @@ async function analyzeThumbnails(thumbnails) {
 
 async function analyzeTitles(titles) {
   try {
-    const res = await fetch('/api/anthropic/v1/messages', {
+    const res = await fetchWithRetry('/api/anthropic/v1/messages', {
       method: 'POST',
       headers: {
         'anthropic-version': '2023-06-01',
