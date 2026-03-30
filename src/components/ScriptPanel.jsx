@@ -278,7 +278,6 @@ JSON만 출력.`;
       setCurrentStep(3);
       setStreamText(prev => prev + '\n\n=== [3/3] 제목 및 썸네일 기획 중 ===\n\n');
 
-      const isShorts = plan.format.startsWith('쇼츠');
       const titlePrompt = `완성된 대본을 바탕으로 제목 후보${isShorts ? '' : '와 썸네일 문구'}를 만들어줘.
 
 [대본 요약] ${rowsResult.rows?.slice(0, 5).map(r => r.script).join(' ')}
