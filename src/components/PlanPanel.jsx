@@ -176,7 +176,9 @@ ${pdfText.substring(0, 50000)}`;
       return it;
     });
     updateState('seriesPlan', { ...seriesPlan, items: newItems });
-    updateState('plan', { ...data, topic: item.title, format: item.format });
+    // Default format: longform → 일반 4~5분, shorts → 쇼츠 60초
+    const defaultFormat = item.format.startsWith('쇼츠') ? '쇼츠 60초' : '일반 4~5분';
+    updateState('plan', { ...data, topic: item.title, format: defaultFormat });
 
     // Auto-summarize for this topic
     if (localFile) {
