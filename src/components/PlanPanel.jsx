@@ -26,8 +26,8 @@ export default function PlanPanel({ globalState, updateState, onNext }) {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setLocalFile(file);
-      handleChange('ebookName', file.name);
-      handleChange('ebookSummary', '');
+      // Batch update to avoid stale closure overwrite
+      updateState('plan', { ...data, ebookName: file.name, ebookSummary: '' });
       setSummaryError('');
       // Reset series plan when new ebook uploaded
       updateState('seriesPlan', { ebookName: '', items: [] });
