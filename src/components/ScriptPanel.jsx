@@ -141,7 +141,7 @@ JSON만 출력.`;
 2. 각 row의 image_prompt: 해당 문장을 시각화하는 이미지 프롬프트 (영어)
    - 반드시 "white background" 포함
    - 캐릭터가 등장하며 해당 내용을 설명하는 포즈/표정
-   - 핵심 키워드를 텍스트로 표시
+   - 이미지 안에 표시되는 텍스트는 가능한 한글로 작성 (예: "text reading '수면 훈련'" 형태로)
 3. 각 row의 video_prompt: 해당 이미지를 5초 영상으로 만들기 위한 Grok 영상 생성 프롬프트 (영어)
    - 카메라 움직임, 캐릭터 애니메이션, 텍스트 등장 효과 등 포함
 4. 훅과 브릿지도 첫 번째 row들로 포함
@@ -439,6 +439,29 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
           whiteSpace: 'pre-wrap', lineHeight: '1.8', fontSize: '0.9375rem', maxHeight: '400px', overflowY: 'auto'
         }}>
           {getFullScriptText()}
+        </div>
+      </div>
+
+      {/* 전체 이미지 프롬프트 (복사용) */}
+      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h3 style={{ fontSize: '1.125rem', margin: 0 }}>
+            전체 이미지 프롬프트 (복사용)
+          </h3>
+          <button
+            className="btn-primary"
+            style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
+            onClick={() => copyText(globalScript.rows?.map(r => r.image_prompt).join('\n\n') || '', 'all_image_prompts')}
+          >
+            {copiedId === 'all_image_prompts' ? <><Check size={14}/> 복사됨</> : <><Copy size={14}/> 전체 이미지 프롬프트 복사</>}
+          </button>
+        </div>
+        <div style={{
+          padding: '1rem', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius-md)',
+          whiteSpace: 'pre-wrap', lineHeight: '1.6', fontSize: '0.8125rem', fontFamily: 'monospace',
+          maxHeight: '400px', overflowY: 'auto'
+        }}>
+          {globalScript.rows?.map(r => r.image_prompt).join('\n\n')}
         </div>
       </div>
 
