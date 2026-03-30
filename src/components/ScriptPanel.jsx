@@ -76,10 +76,14 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
       ? `캐릭터 설명: ${plan.characterDescription}`
       : '업로드된 캐릭터 이미지를 참고';
 
+    const isShorts = plan.format.startsWith('쇼츠');
+
     try {
       // ===== STEP 1: HOOK =====
       setStreamText('=== [1/3] 훅(Hook) 기획 및 작성 중 ===\n\n');
-      const hookPrompt = `다음 정보를 바탕으로 유튜브 영상의 훅(Hook)과 공감·반전 문장을 기획해줘.
+
+      const hookPrompt = isShorts
+        ? `다음 정보를 바탕으로 유튜브 쇼츠의 훅(Hook)을 기획해줘.
 
 [영상 정보]
 주제: ${plan.topic}
@@ -90,8 +94,42 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
 전자책 요약본: ${plan.ebookSummary || '(없음)'}
 벤치마킹 감정 트리거: ${benchmark.titleFormulas?.triggerWords?.join(', ') || '없음'}
 
-[바이럴 영상 공식 - 반드시 이 구조]
-이 채널의 영상은 6단계 구조를 따릅니다:
+[쇼츠 영상 구조 — 4단계]
+❶ Hook — 공포 또는 궁금증 유발 (첫 1~2초)
+❷ 설명 — 핵심 내용 빠르게 전달
+❸ 핵심 — 신경계/뇌과학 기반 핵심 포인트 1가지
+❹ CTA — "이건 꼭 부모님이 알아야 합니다" + 저장/공유 유도
+
+아래 순서대로 생각한 뒤 기획해:
+1. 시청자(부모) 감정 상태 분석
+2. 가장 강한 감정 레버 파악
+3. 훅 유형 선택 (공감형/충격형/숫자형/궁금증형/손실형)
+4. 훅 초안 3개 작성 (각기 다른 유형, 100점 채점)
+5. 최고점 훅 선정
+
+JSON으로 출력:
+{
+  "cot_log": "위 사고 과정 전체 요약",
+  "hook_candidates": [
+    { "type": "유형", "text": "훅 문장", "score": 95, "reason": "한줄평" }
+  ],
+  "final_hook": { "text": "최종 선택된 훅", "score": 98 },
+  "empathy": "",
+  "twist": ""
+}
+JSON만 출력.`
+        : `다음 정보를 바탕으로 유튜브 영상의 훅(Hook)과 공감·반전 문장을 기획해줘.
+
+[영상 정보]
+주제: ${plan.topic}
+포맷: ${plan.format}
+대상: ${plan.targets.join(', ')}
+톤: ${plan.tone}
+연관 전자책: ${plan.ebookName}
+전자책 요약본: ${plan.ebookSummary || '(없음)'}
+벤치마킹 감정 트리거: ${benchmark.titleFormulas?.triggerWords?.join(', ') || '없음'}
+
+[바이럴 영상 공식 — 6단계 구조]
 ❶ Hook (3초) — 공포 또는 궁금증 유발
 ❷ 공감 — 부모 마음을 잡는 공감 문장 (예: "많은 부모님들이 괜찮다고 생각하지만...")
 ❸ 반전 — 행동이 아니라 뇌/신경계 문제라는 관점 전환 (예: "문제는 행동이 아니라 뇌 상태입니다")
@@ -134,23 +172,62 @@ JSON만 출력.`;
       setCurrentStep(2);
       setStreamText(prev => prev + '\n\n=== [2/3] 문장 단위 대본 + 이미지/영상 프롬프트 생성 중 ===\n\n');
 
-      const rowsPrompt = `위에서 기획한 훅·공감·반전을 이어받아, 6단계 바이럴 구조에 맞는 전체 대본을 작성해줘.
+      // Format-specific length guide
+      const lengthGuide = (() => {
+        const f = plan.format;
+        if (f === '쇼츠 15~30초') return { rows: '4~6', chars: '150~300', time: '15~30초' };
+        if (f === '쇼츠 60초') return { rows: '8~12', chars: '400~600', time: '50~60초' };
+        if (f === '일반 4~5분') return { rows: '20~30', chars: '2000~2500', time: '4~5분' };
+        if (f === '일반 8~10분') return { rows: '35~50', chars: '4000~5000', time: '8~10분' };
+        if (f === '일반 10분 이상') return { rows: '50~70', chars: '5000~7000', time: '10분 이상' };
+        return { rows: '20~35', chars: '2000~4000', time: '5~10분' };
+      })();
 
-[기획된 요소]
-훅: ${hookResult.final_hook.text}
-공감: ${hookResult.empathy}
-반전: ${hookResult.twist}
+      const structureGuide = isShorts
+        ? `[쇼츠 4단계 구조 — 반드시 이 순서대로 작성]
+❶ hook — 훅 (첫 1~2초, 공포 또는 궁금증 유발)
+❷ explain — 설명 (핵심 내용 빠르게 전달)
+❸ core — 핵심 포인트 (신경계/뇌과학 기반 핵심 1가지)
+❹ cta — CTA ("이건 꼭 부모님이 알아야 합니다" + 저장/공유 유도)
 
-포맷: ${plan.format}
-연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
-
-[6단계 바이럴 영상 구조 — 반드시 이 순서대로 작성]
+section 배분:
+   - hook: 1개 row
+   - explain: 1~${f === '쇼츠 60초' ? '4' : '2'}개 row
+   - core: 1~${f === '쇼츠 60초' ? '4' : '2'}개 row
+   - cta: 1개 row`
+        : `[6단계 바이럴 영상 구조 — 반드시 이 순서대로 작성]
 ❶ hook — 훅 (3초, 공포 또는 궁금증 유발)
 ❷ empathy — 공감 (부모 마음을 잡는 공감, "많은 부모님들이 괜찮다고 생각하지만...")
 ❸ twist — 반전 (행동→뇌/신경계로 관점 전환, "문제는 행동이 아니라 뇌 상태입니다")
 ❹ core — 핵심 설명 (신경계/뇌과학 근거의 쉬운 설명, 그림처럼 설명)
 ❺ solution — 해결책 (BEFORE→AFTER, 바로 따라할 수 있게)
 ❻ cta — CTA (저장/공유 유도 + 구독 유도, "이건 꼭 부모님이 알아야 합니다")
+
+section 배분 가이드:
+   - hook: 1~2개 row
+   - empathy: 2~4개 row
+   - twist: 1~3개 row
+   - core: 가장 많은 비중 (전체의 약 35%)
+   - solution: 전체의 약 25%
+   - cta: 1~3개 row`;
+
+      const f = plan.format;
+      const rowsPrompt = `위에서 기획한 요소를 이어받아, 전체 대본을 작성해줘.
+
+[기획된 요소]
+훅: ${hookResult.final_hook.text}
+${!isShorts ? `공감: ${hookResult.empathy}\n반전: ${hookResult.twist}` : ''}
+
+포맷: ${plan.format}
+연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
+
+${structureGuide}
+
+[분량 기준 — 매우 중요! 반드시 지켜야 합니다]
+- 목표 영상 길이: ${lengthGuide.time}
+- row 수: ${lengthGuide.rows}개
+- 전체 대본 총 글자 수: ${lengthGuide.chars}자
+- 한국어 TTS 기준 약 350자 = 1분 분량입니다. 이 기준에 맞춰 분량을 조절하세요.
 
 [스타일 가이드]
 - 이 영상은 특정 캐릭터를 활용한 화이트보드 애니메이션 스타일입니다.
@@ -164,21 +241,14 @@ JSON만 출력.`;
 - 끝 = 저장/공유 유도
 
 [출력 규칙]
-1. 대본을 1~2문장 단위로 끊어서 rows 배열에 넣어줘 (총 15~25개 row 정도)
-2. 각 row에 section 필드를 반드시 포함 — 값은 "hook", "empathy", "twist", "core", "solution", "cta" 중 하나
-3. section 배분 가이드:
-   - hook: 1~2개 row
-   - empathy: 1~3개 row
-   - twist: 1~2개 row
-   - core: 4~8개 row (가장 많은 비중)
-   - solution: 3~6개 row
-   - cta: 1~3개 row
-4. 각 row의 image_prompt: 해당 문장을 시각화하는 이미지 프롬프트 (한국어)
+1. 대본을 1~2문장 단위로 끊어서 rows 배열에 넣어줘 (총 ${lengthGuide.rows}개 row)
+2. 각 row에 section 필드를 반드시 포함 — 값은 ${isShorts ? '"hook", "explain", "core", "cta"' : '"hook", "empathy", "twist", "core", "solution", "cta"'} 중 하나
+3. 각 row의 image_prompt: 해당 문장을 시각화하는 이미지 프롬프트 (한국어)
    - 반드시 "흰색 배경" 포함
    - 캐릭터가 등장하며 해당 내용을 설명하는 포즈/표정
    - 이미지 안에 표시되는 텍스트는 한글로 작성 (예: "'수면 훈련'이라고 적힌 텍스트" 형태로)
    - 이미지 안의 텍스트는 화면 상단~중앙(위쪽 70%)에 배치 — 하단 30%는 영상 자막이 들어가므로 텍스트가 겹치지 않도록 할 것
-5. 각 row의 video_prompt: 해당 이미지를 5초 영상으로 만들기 위한 Grok 영상 생성 프롬프트 (한국어)
+4. 각 row의 video_prompt: 해당 이미지를 5초 영상으로 만들기 위한 Grok 영상 생성 프롬프트 (한국어)
    - 카메라 움직임, 캐릭터 애니메이션, 텍스트 등장 효과 등 포함
 
 JSON 출력:
@@ -468,9 +538,10 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
                   hook: { text: '❶ Hook', color: '#ea580c' },
                   empathy: { text: '❷ 공감', color: '#2563eb' },
                   twist: { text: '❸ 반전', color: '#dc2626' },
-                  core: { text: '❹ 핵심', color: '#7c3aed' },
+                  explain: { text: '❷ 설명', color: '#2563eb' },
+                  core: { text: plan.format.startsWith('쇼츠') ? '❸ 핵심' : '❹ 핵심', color: '#7c3aed' },
                   solution: { text: '❺ 해결', color: '#059669' },
-                  cta: { text: '❻ CTA', color: '#d97706' }
+                  cta: { text: plan.format.startsWith('쇼츠') ? '❹ CTA' : '❻ CTA', color: '#d97706' }
                 };
                 const sectionInfo = sectionLabels[row.section] || { text: row.section || '-', color: 'var(--text-muted)' };
                 const prevSection = idx > 0 ? globalScript.rows[idx - 1]?.section : null;

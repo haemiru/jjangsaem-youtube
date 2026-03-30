@@ -81,7 +81,7 @@ ${pdfText.substring(0, 40000)}
 JSON으로 출력:
 {
   "items": [
-    { "title": "영상 제목", "format": "일반 5~10분", "desc": "이 영상에서 다룰 핵심 내용 1줄 요약" },
+    { "title": "영상 제목", "format": "일반 8~10분", "desc": "이 영상에서 다룰 핵심 내용 1줄 요약" },
     { "title": "쇼츠 제목", "format": "쇼츠 15~30초", "desc": "핵심 포인트 1줄" }
   ]
 }
@@ -185,7 +185,7 @@ ${pdfText.substring(0, 50000)}`;
   };
 
   const hasSeries = seriesPlan.items.length > 0;
-  const longformItems = seriesPlan.items.filter(it => it.format === '일반 5~10분');
+  const longformItems = seriesPlan.items.filter(it => it.format.startsWith('일반'));
   const shortsItems = seriesPlan.items.filter(it => it.format.startsWith('쇼츠'));
   const completedCount = seriesPlan.items.filter(it => it.status === 'completed').length;
 
@@ -339,7 +339,7 @@ ${pdfText.substring(0, 50000)}`;
       <div className="form-group">
         <label className="form-label">영상 포맷</label>
         <div className="radio-group">
-          {['쇼츠 15~30초', '쇼츠 60초', '일반 5~10분'].map(fmt => (
+          {['쇼츠 15~30초', '쇼츠 60초', '일반 4~5분', '일반 8~10분', '일반 10분 이상'].map(fmt => (
             <label key={fmt} className={`radio-label ${data.format === fmt ? 'selected' : ''}`}>
               <input type="radio" className="radio-input" checked={data.format === fmt} onChange={() => handleChange('format', fmt)} />
               {fmt}
