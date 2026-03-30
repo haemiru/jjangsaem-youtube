@@ -79,7 +79,7 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
     try {
       // ===== STEP 1: HOOK =====
       setStreamText('=== [1/3] 훅(Hook) 기획 및 작성 중 ===\n\n');
-      const hookPrompt = `다음 정보를 바탕으로 유튜브 영상의 훅(Hook)을 작성해줘.
+      const hookPrompt = `다음 정보를 바탕으로 유튜브 영상의 훅(Hook)과 공감·반전 문장을 기획해줘.
 
 [영상 정보]
 주제: ${plan.topic}
@@ -90,12 +90,23 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
 전자책 요약본: ${plan.ebookSummary || '(없음)'}
 벤치마킹 감정 트리거: ${benchmark.titleFormulas?.triggerWords?.join(', ') || '없음'}
 
-아래 순서대로 생각한 뒤 훅을 작성해:
-1. 시청자 감정 상태 분석
+[바이럴 영상 공식 - 반드시 이 구조]
+이 채널의 영상은 6단계 구조를 따릅니다:
+❶ Hook (3초) — 공포 또는 궁금증 유발
+❷ 공감 — 부모 마음을 잡는 공감 문장 (예: "많은 부모님들이 괜찮다고 생각하지만...")
+❸ 반전 — 행동이 아니라 뇌/신경계 문제라는 관점 전환 (예: "문제는 행동이 아니라 뇌 상태입니다")
+❹ 핵심 설명 — 신경계/뇌과학 기반 설명
+❺ 해결책 — 바로 따라할 수 있는 실용 솔루션
+❻ CTA — 저장/공유 유도 + 구독 유도
+
+아래 순서대로 생각한 뒤 기획해:
+1. 시청자(부모) 감정 상태 분석 — 이 주제를 검색하는 부모의 심리
 2. 가장 강한 감정 레버 파악
 3. 훅 유형 선택 (공감형/충격형/숫자형/궁금증형/손실형)
 4. 훅 초안 3개 작성 (각기 다른 유형, 100점 채점)
-5. 최고점 훅 선정 + 브릿지 문장 생성
+5. 최고점 훅 선정
+6. 공감 문장 작성 — 부모가 "맞아, 우리 아이도..."라고 느낄 문장
+7. 반전 문장 작성 — "사실 이건 행동이 아니라 신경계/뇌 문제"라는 관점 전환
 
 JSON으로 출력:
 {
@@ -104,7 +115,8 @@ JSON으로 출력:
     { "type": "유형", "text": "훅 문장", "score": 95, "reason": "한줄평" }
   ],
   "final_hook": { "text": "최종 선택된 훅", "score": 98 },
-  "bridge": "브릿지 문장"
+  "empathy": "공감 문장",
+  "twist": "반전 문장"
 }
 JSON만 출력.`;
 
@@ -122,13 +134,23 @@ JSON만 출력.`;
       setCurrentStep(2);
       setStreamText(prev => prev + '\n\n=== [2/3] 문장 단위 대본 + 이미지/영상 프롬프트 생성 중 ===\n\n');
 
-      const rowsPrompt = `위에서 생성한 훅을 이어받아 본문 대본을 작성하고, 각 문장마다 이미지 프롬프트와 영상 프롬프트를 함께 생성해줘.
+      const rowsPrompt = `위에서 기획한 훅·공감·반전을 이어받아, 6단계 바이럴 구조에 맞는 전체 대본을 작성해줘.
 
-[훅] ${hookResult.final_hook.text}
-[브릿지] ${hookResult.bridge}
+[기획된 요소]
+훅: ${hookResult.final_hook.text}
+공감: ${hookResult.empathy}
+반전: ${hookResult.twist}
 
 포맷: ${plan.format}
 연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
+
+[6단계 바이럴 영상 구조 — 반드시 이 순서대로 작성]
+❶ hook — 훅 (3초, 공포 또는 궁금증 유발)
+❷ empathy — 공감 (부모 마음을 잡는 공감, "많은 부모님들이 괜찮다고 생각하지만...")
+❸ twist — 반전 (행동→뇌/신경계로 관점 전환, "문제는 행동이 아니라 뇌 상태입니다")
+❹ core — 핵심 설명 (신경계/뇌과학 근거의 쉬운 설명, 그림처럼 설명)
+❺ solution — 해결책 (BEFORE→AFTER, 바로 따라할 수 있게)
+❻ cta — CTA (저장/공유 유도 + 구독 유도, "이건 꼭 부모님이 알아야 합니다")
 
 [스타일 가이드]
 - 이 영상은 특정 캐릭터를 활용한 화이트보드 애니메이션 스타일입니다.
@@ -136,22 +158,34 @@ JSON만 출력.`;
 - 모든 이미지는 흰색 배경 위에 캐릭터와 간단한 텍스트/아이콘으로 구성됩니다.
 - Nick Invests 채널처럼 깔끔하고 미니멀한 교육 콘텐츠 스타일입니다.
 
+[알고리즘 핵심 전략]
+- 첫 3초 = 공포 or 궁금증
+- 중간 = 반전 (행동 → 뇌)
+- 끝 = 저장/공유 유도
+
 [출력 규칙]
 1. 대본을 1~2문장 단위로 끊어서 rows 배열에 넣어줘 (총 15~25개 row 정도)
-2. 각 row의 image_prompt: 해당 문장을 시각화하는 이미지 프롬프트 (한국어)
+2. 각 row에 section 필드를 반드시 포함 — 값은 "hook", "empathy", "twist", "core", "solution", "cta" 중 하나
+3. section 배분 가이드:
+   - hook: 1~2개 row
+   - empathy: 1~3개 row
+   - twist: 1~2개 row
+   - core: 4~8개 row (가장 많은 비중)
+   - solution: 3~6개 row
+   - cta: 1~3개 row
+4. 각 row의 image_prompt: 해당 문장을 시각화하는 이미지 프롬프트 (한국어)
    - 반드시 "흰색 배경" 포함
    - 캐릭터가 등장하며 해당 내용을 설명하는 포즈/표정
    - 이미지 안에 표시되는 텍스트는 한글로 작성 (예: "'수면 훈련'이라고 적힌 텍스트" 형태로)
    - 이미지 안의 텍스트는 화면 상단~중앙(위쪽 70%)에 배치 — 하단 30%는 영상 자막이 들어가므로 텍스트가 겹치지 않도록 할 것
-3. 각 row의 video_prompt: 해당 이미지를 5초 영상으로 만들기 위한 Grok 영상 생성 프롬프트 (한국어)
+5. 각 row의 video_prompt: 해당 이미지를 5초 영상으로 만들기 위한 Grok 영상 생성 프롬프트 (한국어)
    - 카메라 움직임, 캐릭터 애니메이션, 텍스트 등장 효과 등 포함
-4. 훅과 브릿지도 첫 번째 row들로 포함
-5. CTA(구독/전자책 언급)도 마지막 row들로 포함
 
 JSON 출력:
 {
   "rows": [
     {
+      "section": "hook",
       "script": "대본 문장 (한국어)",
       "image_prompt": "흰색 배경, 캐릭터가 ... 포즈로 서 있고 ... (한국어)",
       "video_prompt": "카메라가 천천히 캐릭터를 줌인하며 ... (한국어)"
@@ -175,14 +209,55 @@ JSON만 출력.`;
       setCurrentStep(3);
       setStreamText(prev => prev + '\n\n=== [3/3] 제목 및 썸네일 기획 중 ===\n\n');
 
-      const isShorts = plan.format === '쇼츠 60초';
+      const isShorts = plan.format.startsWith('쇼츠');
       const titlePrompt = `완성된 대본을 바탕으로 제목 후보${isShorts ? '' : '와 썸네일 문구'}를 만들어줘.
 
 [대본 요약] ${rowsResult.rows?.slice(0, 5).map(r => r.script).join(' ')}
 [벤치마킹 제목 공식] ${JSON.stringify(benchmark?.titleFormulas?.formulas || [])}
 [핵심 태그] ${(benchmark?.tagPool || []).slice(0, 10).join(', ')}
 [포맷] ${plan.format}
+${isShorts ? '' : `
+[검증된 고CTR 썸네일 문구 레퍼런스 — 이 패턴을 참고해 주제에 맞게 변형/조합할 것]
+🔥 불안 자극형 (클릭 유도 최강):
+1. 이거… 괜찮은 걸까요?
+2. 이 행동, 위험 신호입니다
+3. 그냥 두면 늦습니다
+4. 많은 부모가 놓칩니다
+5. 정상처럼 보여도 아닙니다
+6. 지금 놓치면 늦어요
+7. 대부분 모르고 지나갑니다
+8. 이건 기다리면 안됩니다
 
+🧠 전문가 포지셔닝형:
+9. 문제는 행동이 아닙니다
+10. 아이 뇌 상태입니다
+11. 신경계가 무너진 신호
+12. 미주신경이 닫혔습니다
+13. 발달이 멈춘 이유
+14. 뇌가 멈춘 상태입니다
+15. 연결이 끊어진 신호
+16. 과부하 상태입니다
+
+⚡ 구분/판별형:
+17. 정상 vs 위험 차이
+18. 자폐 vs 정상 구분법
+19. 괜찮은 경우 vs 개입 필요
+20. 기다려도 되는 아이 vs 아닌 아이
+21. 단순 행동 vs 위험 신호
+22. 멍함 vs freeze 차이
+
+👶 부모 공감형:
+23. 우리 아이도 이랬어요?
+24. 혹시 이런 모습 보이나요?
+25. 이 행동, 많이 보셨죠?
+26. 부모라면 꼭 보세요
+27. 이건 꼭 알아야 합니다
+
+🔥 솔루션 유도형:
+28. 이 3가지만 보세요
+29. 지금 바로 확인하세요
+30. 5분이면 바뀝니다
+`}
 아래 JSON 형식으로만 바로 출력해. thinking 태그 쓰지 마.
 {
   "title_cot_log": "제목 선정 근거 2~3문장",
@@ -190,9 +265,9 @@ JSON만 출력.`;
     { "text": "제목", "score": 90, "reason": "한줄평" }
   ],
   "final_title": "최종 추천 제목"${isShorts ? '' : `,
-  "thumbnail_cot_log": "썸네일 선정 근거 2~3문장",
+  "thumbnail_cot_log": "썸네일 선정 근거 + 어떤 레퍼런스 패턴을 참고했는지 2~3문장",
   "thumbnail_candidates": [
-    { "text": "문구", "score": 90, "reason": "한줄평" }
+    { "text": "문구", "score": 90, "reason": "참고한 레퍼런스 번호 + 한줄평" }
   ],
   "final_thumbnail_copy": "최종 추천 썸네일 문구"`}
 }
@@ -214,7 +289,8 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         ...globalScript,
         cot_log: hookResult.cot_log,
         hook: hookResult.final_hook.text,
-        bridge: hookResult.bridge,
+        empathy: hookResult.empathy,
+        twist: hookResult.twist,
         rows: rowsResult.rows || [],
         full_script: fullScript,
         titleSuggestions: titleResult.title_candidates || [],
@@ -260,8 +336,12 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
     updateState('script', { ...globalScript, hook: text });
   };
 
-  const updateBridge = (text) => {
-    updateState('script', { ...globalScript, bridge: text });
+  const updateEmpathy = (text) => {
+    updateState('script', { ...globalScript, empathy: text });
+  };
+
+  const updateTwist = (text) => {
+    updateState('script', { ...globalScript, twist: text });
   };
 
   const selectThumbnail = (thumbText) => {
@@ -319,28 +399,41 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         <button className="btn-secondary" onClick={generateAll}><RefreshCw size={16}/> 전체 재생성</button>
       </div>
 
-      {/* 훅 카드 */}
+      {/* 훅·공감·반전 기획 카드 */}
       <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.5rem', backgroundColor: 'var(--secondary)' }}>
         <h3 style={{ fontSize: '1.125rem', marginBottom: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          Hook & Bridge
+          6단계 바이럴 구조 기획
         </h3>
-        <textarea
-          className="form-control"
-          style={{ fontSize: '1.125rem', fontWeight: 600, minHeight: '80px', lineHeight: '1.6', backgroundColor: 'var(--surface)' }}
-          value={globalScript.hook}
-          onChange={(e) => updateHook(e.target.value)}
-        />
-        {globalScript.bridge !== undefined && (
-          <div style={{ marginTop: '1rem' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' }}>Bridge</label>
-            <textarea
-              className="form-control"
-              style={{ minHeight: '60px', lineHeight: '1.6', fontSize: '0.9375rem' }}
-              value={globalScript.bridge || ''}
-              onChange={(e) => updateBridge(e.target.value)}
-            />
-          </div>
-        )}
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.25rem', display: 'block' }}>❶ Hook (3초)</label>
+          <textarea
+            className="form-control"
+            style={{ fontSize: '1.125rem', fontWeight: 600, minHeight: '70px', lineHeight: '1.6', backgroundColor: 'var(--surface)' }}
+            value={globalScript.hook}
+            onChange={(e) => updateHook(e.target.value)}
+          />
+        </div>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#2563eb', marginBottom: '0.25rem', display: 'block' }}>❷ 공감</label>
+          <textarea
+            className="form-control"
+            style={{ minHeight: '60px', lineHeight: '1.6', fontSize: '0.9375rem', backgroundColor: 'var(--surface)' }}
+            value={globalScript.empathy || ''}
+            onChange={(e) => updateEmpathy(e.target.value)}
+          />
+        </div>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#dc2626', marginBottom: '0.25rem', display: 'block' }}>❸ 반전</label>
+          <textarea
+            className="form-control"
+            style={{ minHeight: '60px', lineHeight: '1.6', fontSize: '0.9375rem', backgroundColor: 'var(--surface)' }}
+            value={globalScript.twist || ''}
+            onChange={(e) => updateTwist(e.target.value)}
+          />
+        </div>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '0.5rem 0.75rem', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-sm)' }}>
+          ❹ 핵심 설명 → ❺ 해결책 → ❻ CTA 는 아래 대본 테이블에서 확인
+        </div>
         <div style={{ marginTop: '1rem' }}>
           <button onClick={() => setShowHookCot(!showHookCot)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             [CoT 사유 과정 {showHookCot ? '접기' : '보기'}]
@@ -362,16 +455,34 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--gray-100)' }}>
-                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '5%', whiteSpace: 'nowrap' }}>#</th>
-                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '35%' }}>대본</th>
-                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '30%' }}>이미지 프롬프트</th>
-                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '30%' }}>영상 프롬프트</th>
+                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '4%', whiteSpace: 'nowrap' }}>#</th>
+                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '9%', whiteSpace: 'nowrap' }}>구간</th>
+                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '32%' }}>대본</th>
+                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '27.5%' }}>이미지 프롬프트</th>
+                <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--border)', textAlign: 'left', width: '27.5%' }}>영상 프롬프트</th>
               </tr>
             </thead>
             <tbody>
-              {globalScript.rows?.map((row, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid var(--border)', verticalAlign: 'top' }}>
+              {globalScript.rows?.map((row, idx) => {
+                const sectionLabels = {
+                  hook: { text: '❶ Hook', color: '#ea580c' },
+                  empathy: { text: '❷ 공감', color: '#2563eb' },
+                  twist: { text: '❸ 반전', color: '#dc2626' },
+                  core: { text: '❹ 핵심', color: '#7c3aed' },
+                  solution: { text: '❺ 해결', color: '#059669' },
+                  cta: { text: '❻ CTA', color: '#d97706' }
+                };
+                const sectionInfo = sectionLabels[row.section] || { text: row.section || '-', color: 'var(--text-muted)' };
+                const prevSection = idx > 0 ? globalScript.rows[idx - 1]?.section : null;
+                const isNewSection = row.section !== prevSection;
+                return (
+                <tr key={idx} style={{ borderBottom: '1px solid var(--border)', verticalAlign: 'top', borderTop: isNewSection && idx > 0 ? '2px solid var(--gray-300)' : undefined }}>
                   <td style={{ padding: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>{idx + 1}</td>
+                  <td style={{ padding: '0.75rem', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: sectionInfo.color, backgroundColor: sectionInfo.color + '15', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
+                      {sectionInfo.text}
+                    </span>
+                  </td>
                   <td style={{ padding: '0.5rem' }}>
                     <textarea
                       className="form-control"
@@ -415,7 +526,8 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -540,7 +652,27 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
 // --- API Helpers ---
 
 async function runClaudeStream(messages, model, _apiKey, onChunk) {
-  const systemPrompt = `당신은 jjangsaem.com의 유튜브 콘텐츠 전문가입니다. 피지오 후각 연구소 소속으로 발달장애 아동 및 가족을 위한 뇌과학 근거 중심의 전문적이고 따뜻한 어조로 작성합니다. 반드시 유효한 JSON 형식으로 응답하세요. JSON 앞뒤에 불필요한 텍스트를 넣지 마세요.`;
+  const systemPrompt = `당신은 키즈피지오 유튜브 채널의 콘텐츠 전문가입니다.
+
+[채널 컨셉]
+"아이 행동을 고치는 채널이 아니라, 아이의 '신경계'를 이해하는 채널"
+
+[브랜드 핵심 메시지]
+- "문제 행동이 아니라 신경계 상태입니다"
+- "발달은 훈련이 아니라 안정 위에 만들어집니다"
+- "아이를 바꾸지 말고, 신경계를 바꾸세요"
+
+[채널 슬로건]
+"아이의 행동을 고치지 마세요. 뇌를 이해하면 행동은 바뀝니다"
+
+[차별점]
+다른 채널은 '행동 설명'에 그치지만, 이 채널은 '신경계 설명 + 해결'까지 제시합니다.
+부모는 행동을 보고, 전문가는 신경계를 봅니다.
+
+[어조]
+발달장애 아동 및 가족을 위한 뇌과학 근거 중심의 전문적이고 따뜻한 어조로 작성합니다.
+
+반드시 유효한 JSON 형식으로 응답하세요. JSON 앞뒤에 불필요한 텍스트를 넣지 마세요.`;
 
   const response = await fetch('/api/anthropic/v1/messages', {
     method: 'POST',

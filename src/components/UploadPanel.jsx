@@ -159,6 +159,12 @@ JSON만 출력.`;
         }
       }
 
+      // Auto Append channel links
+      const channelLinks = `\n\n━━━━━━━━━━━━━━━━━━━━\n📸 짱샘의 인스타: @seochojiye\n📝 짱샘의 블로그: https://blog.naver.com/imoim77\n💬 카카오톡 문의: https://open.kakao.com/o/s3YnSoni`;
+      if (!parsed.description.text.includes('blog.naver.com/imoim77')) {
+        parsed.description.text += channelLinks;
+      }
+
       setLocalMeta(parsed);
       updateState('metadata', { ...metadata, ...parsed, cotLog: parsed.cot_log });
 
@@ -167,10 +173,11 @@ JSON만 출력.`;
       setUsedFallback(true);
       // Fallback Mock
       const ebookLine = plan.ebookUrl ? `\n\n📚 연계 전자책 보기: ${plan.ebookUrl}` : '';
+      const chLinks = `\n\n━━━━━━━━━━━━━━━━━━━━\n📸 짱샘의 인스타: @seochojiye\n📝 짱샘의 블로그: https://blog.naver.com/imoim77\n💬 카카오톡 문의: https://open.kakao.com/o/s3YnSoni`;
       const fallback = {
         cot_log: "1. 검색 의도 분석...\n2. 키워드 계층 설계...\n3. 제목 선택...\n...",
         title: { text: script.final_title || '터미타임 성공 비법', score: 95, improvement_note: '감정 단어 추가' },
-        description: { text: `우리 아이 터미타임 잘하는 방법!\n\n0:00 오프닝\n0:30 본문 시작${ebookLine}`, score: 90, preview_lines: '우리 아이 터미타임 잘하는 방법!' },
+        description: { text: `우리 아이 터미타임 잘하는 방법!\n\n0:00 오프닝\n0:30 본문 시작${ebookLine}${chLinks}`, score: 90, preview_lines: '우리 아이 터미타임 잘하는 방법!' },
         tags: { list: ['육아', '터미타임', '신생아'], score: 90, char_count: 50 },
         hashtags: ['#육아꿀팁', '#터미타임', '#jjangsaem'],
         revision_count: 1

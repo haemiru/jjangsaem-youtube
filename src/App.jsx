@@ -34,7 +34,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.j
 const INIT_STATE = {
   plan: { topic: '', format: '쇼츠 60초', targets: [], ebookName: '', ebookSummary: '', ebookUrl: '', tone: '전문적', model: 'claude-opus-4-6', characterImage: '', characterDescription: '' },
   benchmark: { channels: [], thumbnailPatterns: [], titleFormulas: [], tagPool: [] },
-  script: { hook: '', bridge: '', sections: [], cta: '', titleSuggestions: [], thumbnailCopies: [] },
+  script: { hook: '', empathy: '', twist: '', sections: [], cta: '', titleSuggestions: [], thumbnailCopies: [] },
   media: { selectedThumbnailCopy: '', imagePrompts: [], generatedImages: [], selectedThumbnail: '' },
   metadata: { title: '', description: '', tags: [], hashtags: [], cotLog: '' },
   upload: { scheduleType: '', scheduledAt: '', visibility: '', uploadStatus: '' }

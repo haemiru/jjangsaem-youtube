@@ -40,7 +40,7 @@ export default function BenchmarkPanel({ globalState, updateState, onNext }) {
       }
 
       // 3. Analyze Thumbnails (skip for Shorts)
-      const isShorts = plan.format === '쇼츠 60초';
+      const isShorts = plan.format.startsWith('쇼츠');
       let thumbnailPatterns = null;
       if (!isShorts) {
         setProgress({ step: 3, text: '🖼️ 썸네일 패턴 분석 중...', error: '' });
@@ -117,7 +117,7 @@ export default function BenchmarkPanel({ globalState, updateState, onNext }) {
           </div>
           {isProcessing && (
             <div style={{ marginTop: '1rem', height: '8px', backgroundColor: 'var(--gray-300)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${(progress.step / (plan.format === '쇼츠 60초' ? 4 : 5)) * 100}%`, height: '100%', backgroundColor: 'var(--primary)', transition: 'width 0.3s' }} />
+              <div style={{ width: `${(progress.step / (plan.format.startsWith('쇼츠') ? 4 : 5)) * 100}%`, height: '100%', backgroundColor: 'var(--primary)', transition: 'width 0.3s' }} />
             </div>
           )}
         </div>
@@ -138,7 +138,7 @@ export default function BenchmarkPanel({ globalState, updateState, onNext }) {
               <AlertCircle size={16} style={{ flexShrink: 0 }} /> {fallbackWarning}
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: plan.format === '쇼츠 60초' ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: plan.format.startsWith('쇼츠') ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
             {/* Thumbnail Pattern Card (숏츠가 아닐 때만 표시) */}
             {plan.format !== '쇼츠 60초' && (
             <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.5rem' }}>

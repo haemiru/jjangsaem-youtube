@@ -89,14 +89,14 @@ export async function synthesizeAllSections(script, { stylePrompt, speedRate = D
 
   const textParts = [];
   const introText = script.hook
-    ? script.hook + (script.bridge ? ' ' + script.bridge : '')
+    ? script.hook + (script.empathy ? ' ' + script.empathy : '') + (script.twist ? ' ' + script.twist : '')
     : '';
   if (introText) {
     textParts.push({ id: 'intro', text: introText });
   }
   if (script.sections) {
     script.sections.forEach((sec, idx) => {
-      // Skip section if it duplicates the intro (hook + bridge)
+      // Skip section if it duplicates the intro (hook + empathy + twist)
       const secText = (sec.script || '').replace(/\s+/g, '');
       const introNorm = introText.replace(/\s+/g, '');
       if (introNorm && (secText === introNorm || introNorm.includes(secText) || secText.includes(introNorm))) {
