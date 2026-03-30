@@ -192,8 +192,8 @@ JSON만 출력.`;
 
 section 배분:
    - hook: 1개 row
-   - explain: 1~${f === '쇼츠 60초' ? '4' : '2'}개 row
-   - core: 1~${f === '쇼츠 60초' ? '4' : '2'}개 row
+   - explain: 1~${plan.format === '쇼츠 60초' ? '4' : '2'}개 row
+   - core: 1~${plan.format === '쇼츠 60초' ? '4' : '2'}개 row
    - cta: 1개 row`
         : `[6단계 바이럴 영상 구조 — 반드시 이 순서대로 작성]
 ❶ hook — 훅 (3초, 공포 또는 궁금증 유발)
@@ -211,7 +211,6 @@ section 배분 가이드:
    - solution: 전체의 약 25%
    - cta: 1~3개 row`;
 
-      const f = plan.format;
       const rowsPrompt = `위에서 기획한 요소를 이어받아, 전체 대본을 작성해줘.
 
 [기획된 요소]
