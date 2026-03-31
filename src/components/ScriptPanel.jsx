@@ -77,12 +77,12 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
 
   const lengthGuide = (() => {
     const f = plan.format;
-    if (f === '쇼츠 15~30초') return { rows: '4~8', chars: '150~250', time: '15~30초' };
-    if (f === '쇼츠 60초') return { rows: '8~14', chars: '350~500', time: '50~60초' };
-    if (f === '일반 4~5분') return { rows: '30~40', chars: '1500~2000', time: '4~5분' };
-    if (f === '일반 8~10분') return { rows: '50~70', chars: '3000~4000', time: '8~10분' };
-    if (f === '일반 10분 이상') return { rows: '70~90', chars: '4000~5500', time: '10분 이상' };
-    return { rows: '30~50', chars: '2000~3000', time: '5~10분' };
+    if (f === '쇼츠 15~30초') return { rows: '8~16', chars: '300~500', time: '15~30초' };
+    if (f === '쇼츠 60초') return { rows: '16~28', chars: '700~1000', time: '50~60초' };
+    if (f === '일반 4~5분') return { rows: '60~80', chars: '3000~4000', time: '4~5분' };
+    if (f === '일반 8~10분') return { rows: '100~140', chars: '6000~8000', time: '8~10분' };
+    if (f === '일반 10분 이상') return { rows: '140~180', chars: '8000~11000', time: '10분 이상' };
+    return { rows: '60~100', chars: '4000~6000', time: '5~10분' };
   })();
 
   const structureGuide = isShorts
