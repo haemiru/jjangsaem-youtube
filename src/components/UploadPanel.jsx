@@ -29,13 +29,15 @@ export default function UploadPanel({ globalState, updateState, onNext, setActiv
 
   // Video file
   const [videoFile, setVideoFile] = useState(null);
+  // Thumbnail file
+  const [thumbnailFile, setThumbnailFile] = useState(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState(null);
 
   // Upload options
   const [uploadOpts, setUploadOpts] = useState({
     privacy: 'private',
     scheduleTime: '',
     playlistId: '',
-    selectedThumb: 'a',
   });
 
   // Upload Progress
@@ -139,7 +141,7 @@ JSON만 출력.`;
           'content-type': 'application/json'
         },
         body: JSON.stringify({
-          model: plan.model,
+          model: 'claude-sonnet-4-6',
           max_tokens: 4096,
           system: systemPrompt,
           messages: [{ role: "user", content: prompt }]
@@ -242,11 +244,10 @@ JSON만 출력.`;
         },
       });
 
-      // Upload thumbnail if available
-      const thumbUrl = uploadOpts.selectedThumb === 'a' ? media.thumbnailA : media.thumbnailB;
-      if (thumbUrl && thumbUrl.startsWith('data:')) {
+      // Upload thumbnail if available (file upload or media tab)
+      if (thumbnailPreview && thumbnailPreview.startsWith('data:')) {
         setUploadStatus(p => ({ ...p, percent: 95, text: '썸네일 적용 중...' }));
-        await setThumbnail(accessToken, videoId, thumbUrl);
+        await setThumbnail(accessToken, videoId, thumbnailPreview);
       }
 
       setUploadStatus({ isUploading: false, percent: 100, text: '업로드 완료!', videoId, error: '' });
@@ -279,6 +280,16 @@ JSON만 출력.`;
   const handleVideoFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setVideoFile(e.target.files[0]);
+    }
+  };
+
+  const handleThumbnailFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setThumbnailFile(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => setThumbnailPreview(ev.target.result);
+      reader.readAsDataURL(file);
     }
   };
 
@@ -478,27 +489,24 @@ JSON만 출력.`;
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-          {/* Thumbnail Selection */}
+          {/* Thumbnail Upload */}
           <div>
-            <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }}>썸네일 선택</div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {['a', 'b'].map(variant => {
-                const url = variant === 'a' ? media.thumbnailA : media.thumbnailB;
-                const isSelected = uploadOpts.selectedThumb === variant;
-                return (
-                  <div key={variant} style={{ flex: 1, cursor: 'pointer' }} onClick={() => setUploadOpts({...uploadOpts, selectedThumb: variant})}>
-                    <div style={{
-                      height: '80px', backgroundColor: 'var(--gray-200)',
-                      backgroundImage: url ? `url(${url})` : 'none', backgroundSize: 'cover',
-                      borderRadius: '4px', border: isSelected ? '3px solid var(--primary)' : '1px solid var(--gray-200)',
-                    }} />
-                    <div style={{ fontSize: '0.75rem', textAlign: 'center', marginTop: '0.25rem', fontWeight: isSelected ? 700 : 400, color: isSelected ? 'var(--primary)' : 'var(--text-muted)' }}>
-                      {variant.toUpperCase()} 버전 {isSelected ? '(선택됨)' : ''}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }}>썸네일 이미지</div>
+            {thumbnailPreview ? (
+              <div style={{ position: 'relative' }}>
+                <img src={thumbnailPreview} alt="썸네일 미리보기" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '4px', border: '2px solid var(--primary)' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.25rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{thumbnailFile?.name}</span>
+                  <button style={{ fontSize: '0.7rem', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => { setThumbnailFile(null); setThumbnailPreview(null); }}>제거</button>
+                </div>
+              </div>
+            ) : (
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100px', backgroundColor: 'var(--gray-100)', border: '2px dashed var(--gray-300)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleThumbnailFileChange} />
+                클릭하여 썸네일 선택<br/>(권장: 1280×720)
+              </label>
+            )}
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>미선택 시 YouTube 자동 썸네일 적용</div>
           </div>
 
           {/* Upload Options */}
