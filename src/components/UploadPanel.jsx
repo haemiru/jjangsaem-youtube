@@ -140,7 +140,7 @@ JSON만 출력.`;
         },
         body: JSON.stringify({
           model: plan.model,
-          max_tokens: 2000,
+          max_tokens: 4096,
           system: systemPrompt,
           messages: [{ role: "user", content: prompt }]
         })
@@ -148,10 +148,23 @@ JSON만 출력.`;
 
       if (!res.ok) throw new Error('메타데이터 API 통신 실패');
       const data = await res.json();
-      const match = data.content[0].text.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('JSON 파싱 실패');
-
-      const parsed = JSON.parse(match[0]);
+      const rawText = data.content[0].text;
+      // <thinking> 태그 제거 후 robust JSON 파싱
+      let cleaned = rawText.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+      const codeBlockMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+      if (codeBlockMatch) cleaned = codeBlockMatch[1].trim();
+      let parsed;
+      try { parsed = JSON.parse(cleaned); } catch {
+        const startIdx = cleaned.indexOf('{');
+        if (startIdx === -1) throw new Error('JSON 파싱 실패');
+        let depth = 0, endIdx = -1;
+        for (let i = startIdx; i < cleaned.length; i++) {
+          if (cleaned[i] === '{') depth++;
+          else if (cleaned[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
+        }
+        if (endIdx === -1) throw new Error('JSON 파싱 실패: 불완전한 JSON');
+        parsed = JSON.parse(cleaned.substring(startIdx, endIdx + 1));
+      }
 
       // Auto Append ebook link
       if (plan.ebookUrl) {
