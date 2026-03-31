@@ -248,7 +248,7 @@ JSON만 출력.`;
   };
 
   const buildTitlePrompt = (rowsResult) => {
-    return `완성된 대본을 바탕으로 제목 후보${isShorts ? '' : '와 썸네일 문구'}를 만들어줘.
+    return `완성된 대본을 바탕으로 제목 후보${isShorts ? '' : ', 썸네일 문구, 썸네일 이미지 프롬프트'}를 만들어줘.
 
 [대본 요약] ${rowsResult.rows?.slice(0, 5).map(r => r.script).join(' ')}
 [벤치마킹 제목 공식] ${JSON.stringify(benchmark?.titleFormulas?.formulas || [])}
@@ -261,6 +261,14 @@ ${isShorts ? '' : `
 ⚡ 구분/판별형: 정상 vs 위험 차이 / 자폐 vs 정상 구분법 / 기다려도 되는 아이 vs 아닌 아이 / 단순 행동 vs 위험 신호 / 멍함 vs freeze 차이
 👶 부모 공감형: 우리 아이도 이랬어요? / 혹시 이런 모습 보이나요? / 이 행동, 많이 보셨죠? / 부모라면 꼭 보세요 / 이건 꼭 알아야 합니다
 🔥 솔루션 유도형: 이 3가지만 보세요 / 지금 바로 확인하세요 / 5분이면 바뀝니다
+
+[썸네일 이미지 프롬프트 가이드]
+A/B 테스트용으로 2개의 썸네일 이미지 생성 프롬프트를 영어로 작성해줘.
+- 유튜브 썸네일 (16:9)에 최적화
+- 한글 텍스트는 그대로 포함 (예: bold Korean text reading "위험 신호")
+- 높은 대비, 깔끔한 디자인
+- A안: 인물/캐릭터 중심 레이아웃
+- B안: 텍스트/인포그래픽 중심 레이아웃
 `}
 아래 JSON 형식으로만 바로 출력해. thinking 태그 쓰지 마.
 {
@@ -273,7 +281,11 @@ ${isShorts ? '' : `
   "thumbnail_candidates": [
     { "text": "문구", "score": 90, "reason": "참고한 레퍼런스 번호 + 한줄평" }
   ],
-  "final_thumbnail_copy": "최종 추천 썸네일 문구"`}
+  "final_thumbnail_copy": "최종 추천 썸네일 문구",
+  "thumbnail_image_prompts": [
+    { "variant": "A", "prompt": "YouTube thumbnail, 16:9, ... (영어 프롬프트)", "concept": "인물 중심 — 한줄 설명" },
+    { "variant": "B", "prompt": "YouTube thumbnail, 16:9, ... (영어 프롬프트)", "concept": "텍스트 중심 — 한줄 설명" }
+  ]`}
 }
 JSON만 출력. 다른 텍스트 절대 금지.`;
   };
@@ -312,6 +324,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         full_script: fullScript,
         titleSuggestions: parsed.title_candidates || [],
         thumbnailCopies: parsed.thumbnail_candidates || [],
+        thumbnailImagePrompts: parsed.thumbnail_image_prompts || [],
         final_title: parsed.final_title,
         final_thumbnail_copy: parsed.final_thumbnail_copy,
         final_hook: manualHookResult.final_hook
@@ -402,6 +415,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         full_script: fullScript,
         titleSuggestions: titleResult.title_candidates || [],
         thumbnailCopies: titleResult.thumbnail_candidates || [],
+        thumbnailImagePrompts: titleResult.thumbnail_image_prompts || [],
         final_title: titleResult.final_title,
         final_thumbnail_copy: titleResult.final_thumbnail_copy,
         final_hook: hookResult.final_hook
@@ -869,6 +883,36 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
           </div>
         </div>
       </div>
+
+      {/* 썸네일 이미지 프롬프트 A/B */}
+      {globalScript.thumbnailImagePrompts?.length > 0 && (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.5rem' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem', marginBottom: '1rem' }}>
+            <ImageIcon size={20} color="var(--primary)"/> 썸네일 이미지 프롬프트 (A/B)
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {globalScript.thumbnailImagePrompts.map((tp, idx) => (
+              <div key={idx} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <span style={{ fontWeight: 700, color: idx === 0 ? '#2563eb' : '#7c3aed' }}>
+                    {tp.variant || (idx === 0 ? 'A' : 'B')}안 — {tp.concept}
+                  </span>
+                  <button
+                    className="btn-primary"
+                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                    onClick={() => copyText(tp.prompt, `thumb_img_${idx}`)}
+                  >
+                    {copiedId === `thumb_img_${idx}` ? <><Check size={12}/> 복사됨</> : <><Copy size={12}/> 복사</>}
+                  </button>
+                </div>
+                <div style={{ padding: '0.75rem', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius-sm)', fontSize: '0.8125rem', fontFamily: 'monospace', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                  {tp.prompt}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
         <button className="btn-primary" onClick={onNext}>
