@@ -85,7 +85,7 @@ export default function PlanPanel({ globalState, updateState, onNext }) {
 각 주제는 유튜브에서 클릭을 유발하는 제목 형태로 작성해주세요.
 
 [전자책 내용]
-${pdfText.substring(0, 40000)}
+${pdfText.substring(0, 20000)}
 
 JSON으로 출력:
 {
@@ -149,7 +149,7 @@ JSON만 출력.`;
 텍스트가 너무 길면 핵심 위주로 1000자 이내로 압축해주세요.
 
 [PDF 텍스트]
-${pdfText.substring(0, 50000)}`;
+${pdfText.substring(0, 20000)}`;
 
       const res = await fetchWithRetry('/api/anthropic/v1/messages', {
         method: 'POST',
