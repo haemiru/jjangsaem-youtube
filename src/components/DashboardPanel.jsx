@@ -1,5 +1,5 @@
 import React from 'react';
-import { ClipboardList, Search, FileText, Image as ImageIcon, Upload, CheckCircle2, Circle, ChevronRight, BarChart2, Tag, Type, Clock } from 'lucide-react';
+import { ClipboardList, Search, FileText, Image as ImageIcon, Upload, CheckCircle2, Circle, ChevronRight, BarChart2, Tag, Type, Clock, ArrowRight } from 'lucide-react';
 
 const STEPS = [
   { id: 'plan', label: '기획', icon: ClipboardList },
@@ -40,8 +40,8 @@ function ScoreBar({ score, label }) {
   );
 }
 
-export default function DashboardPanel({ globalState, onNavigate }) {
-  const { plan, benchmark, script, media, metadata, upload } = globalState;
+export default function DashboardPanel({ globalState, onNavigate, updateState }) {
+  const { plan, benchmark, script, media, metadata, upload, seriesPlan } = globalState;
 
   const stepsWithStatus = STEPS.map(s => ({ ...s, status: getStepStatus(s.id, globalState) }));
   const doneCount = stepsWithStatus.filter(s => s.status === 'done').length;
@@ -234,22 +234,110 @@ export default function DashboardPanel({ globalState, onNavigate }) {
           )}
 
           {/* Upload Status */}
-          {upload.videoId && (
+          {(upload.videoId || upload.uploadStatus === 'manual_complete') && (
             <div style={{ padding: '1.25rem', border: '2px solid #22c55e', borderRadius: 'var(--radius-lg)', backgroundColor: '#f0fdf4', gridColumn: '1 / -1' }}>
               <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#22c55e' }}>
                 <CheckCircle2 size={16} /> 업로드 완료
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                <StatRow label="Video ID" value={upload.videoId} />
-                <StatRow label="공개 범위" value={upload.privacy === 'public' ? '공개' : upload.privacy === 'unlisted' ? '일부 공개' : '비공개'} />
-                {upload.uploadAt && <StatRow label="업로드 시각" value={new Date(upload.uploadAt).toLocaleString('ko-KR')} />}
-              </div>
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-                <a href={`https://studio.youtube.com/video/${upload.videoId}/edit`} target="_blank" rel="noreferrer" className="btn-secondary" style={{ textDecoration: 'none', fontSize: '0.875rem' }}>YouTube Studio</a>
-                <a href={`https://youtube.com/watch?v=${upload.videoId}`} target="_blank" rel="noreferrer" className="btn-secondary" style={{ textDecoration: 'none', fontSize: '0.875rem' }}>영상 보기</a>
-              </div>
+              {upload.videoId && upload.videoId !== 'manual' ? (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    <StatRow label="Video ID" value={upload.videoId} />
+                    <StatRow label="공개 범위" value={upload.privacy === 'public' ? '공개' : upload.privacy === 'unlisted' ? '일부 공개' : '비공개'} />
+                    {upload.uploadAt && <StatRow label="업로드 시각" value={new Date(upload.uploadAt).toLocaleString('ko-KR')} />}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                    <a href={`https://studio.youtube.com/video/${upload.videoId}/edit`} target="_blank" rel="noreferrer" className="btn-secondary" style={{ textDecoration: 'none', fontSize: '0.875rem' }}>YouTube Studio</a>
+                    <a href={`https://youtube.com/watch?v=${upload.videoId}`} target="_blank" rel="noreferrer" className="btn-secondary" style={{ textDecoration: 'none', fontSize: '0.875rem' }}>영상 보기</a>
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                  직접 YouTube에 업로드 완료됨
+                </div>
+              )}
             </div>
           )}
+
+          {/* Series Progress */}
+          {seriesPlan?.items?.length > 0 && (upload.videoId || upload.uploadStatus === 'manual_complete') && (() => {
+            const currentIdx = seriesPlan.items.findIndex(it => it.status === 'current');
+            const nextItem = seriesPlan.items.find((it, i) => i > currentIdx && it.status === 'pending');
+            const completedCount = seriesPlan.items.filter(it => it.status === 'completed').length;
+
+            const handleContinue = () => {
+              const newItems = seriesPlan.items.map(it => {
+                if (it.status === 'current') return { ...it, status: 'completed' };
+                return it;
+              });
+              if (nextItem) {
+                const nextIdx = seriesPlan.items.indexOf(nextItem);
+                newItems[nextIdx] = { ...newItems[nextIdx], status: 'current' };
+              }
+              updateState('seriesPlan', { ...seriesPlan, items: newItems });
+
+              if (nextItem) {
+                updateState('plan', { ...plan, topic: nextItem.title, format: nextItem.format });
+                updateState('script', { hook: '', empathy: '', twist: '', sections: [], cta: '', titleSuggestions: [], thumbnailCopies: [] });
+                updateState('benchmark', { channels: [], thumbnailPatterns: [], titleFormulas: [], tagPool: [] });
+                updateState('metadata', { title: '', description: '', tags: [], hashtags: [], cotLog: '' });
+                updateState('upload', { scheduleType: '', scheduledAt: '', visibility: '', uploadStatus: '' });
+              }
+              onNavigate('plan');
+            };
+
+            return (
+              <div style={{ padding: '1.25rem', border: '2px solid #3b82f6', borderRadius: 'var(--radius-lg)', backgroundColor: '#eff6ff', gridColumn: '1 / -1' }}>
+                <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1d4ed8' }}>
+                  <BarChart2 size={16} /> 시리즈 진행 현황: {completedCount + 1}/{seriesPlan.items.length} 완료
+                </h3>
+
+                {/* Series item list */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+                  {seriesPlan.items.map((item, idx) => (
+                    <div key={idx} style={{
+                      display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.75rem',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: item.status === 'current' ? '#dbeafe' : item.status === 'completed' ? '#f0fdf4' : 'white',
+                      border: item.status === 'current' ? '1px solid #93c5fd' : '1px solid var(--gray-200)'
+                    }}>
+                      {item.status === 'completed' ? (
+                        <CheckCircle2 size={16} color="#22c55e" />
+                      ) : item.status === 'current' ? (
+                        <ArrowRight size={16} color="#3b82f6" />
+                      ) : (
+                        <Circle size={16} color="var(--gray-300)" />
+                      )}
+                      <span style={{ flex: 1, fontSize: '0.875rem', fontWeight: item.status === 'current' ? 600 : 400 }}>
+                        {item.title}
+                      </span>
+                      <span style={{
+                        fontSize: '0.75rem', padding: '0.1rem 0.4rem', borderRadius: '3px',
+                        color: item.format?.startsWith('쇼츠') ? '#ea580c' : '#7c3aed',
+                        backgroundColor: item.format?.startsWith('쇼츠') ? '#ea580c15' : '#7c3aed15'
+                      }}>
+                        {item.format}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {nextItem ? (
+                  <button
+                    className="btn-primary"
+                    style={{ width: '100%', padding: '0.75rem', fontSize: '1rem' }}
+                    onClick={handleContinue}
+                  >
+                    다음 영상 제작 시작하기: {nextItem.title}
+                  </button>
+                ) : (
+                  <div style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#16a34a', textAlign: 'center', padding: '0.5rem' }}>
+                    모든 시리즈 영상 제작이 완료되었습니다!
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

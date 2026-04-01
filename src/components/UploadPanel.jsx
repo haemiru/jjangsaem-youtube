@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UploadCloud, CheckCircle2, ChevronDown, ChevronUp, Tag, Youtube, Calendar, X, PlaySquare, FileText, Loader2, ArrowRight, LogIn, Film, AlertCircle, RefreshCw } from 'lucide-react';
+import { UploadCloud, CheckCircle2, ChevronDown, ChevronUp, Tag, Youtube, Calendar, X, PlaySquare, FileText, Loader2, ArrowRight, LogIn, Film, AlertCircle, RefreshCw, Copy, Check } from 'lucide-react';
 import { requestAccessToken, verifyToken, fetchPlaylists, uploadVideo, setThumbnail } from '../services/youtubeService';
 
 import { fetchWithRetry } from '../utils/fetchWithRetry';
@@ -21,6 +21,14 @@ export default function UploadPanel({ globalState, updateState, onNext, setActiv
   // UI states
   const [showCot, setShowCot] = useState({ title: false, desc: false });
   const [newTag, setNewTag] = useState('');
+  const [copied, setCopied] = useState({ title: false, desc: false, tags: false });
+
+  const copyToClipboard = (text, field) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(prev => ({ ...prev, [field]: true }));
+      setTimeout(() => setCopied(prev => ({ ...prev, [field]: false })), 2000);
+    });
+  };
 
   // YouTube Auth
   const [accessToken, setAccessToken] = useState(null);
@@ -353,7 +361,17 @@ JSON만 출력.`;
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem', margin: 0 }}>
             제목
           </h3>
-          <span className="status-badge success" style={{ fontSize: '1rem' }}>{localMeta.title.score}점</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              onClick={() => copyToClipboard(localMeta.title.text, 'title')}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.75rem', fontSize: '0.8125rem' }}
+            >
+              {copied.title ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+              {copied.title ? '복사됨' : '복사'}
+            </button>
+            <span className="status-badge success" style={{ fontSize: '1rem' }}>{localMeta.title.score}점</span>
+          </div>
         </div>
         <input
           type="text"
@@ -380,7 +398,17 @@ JSON만 출력.`;
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem', margin: 0 }}>
             설명 (Description)
           </h3>
-          <span className="status-badge warning" style={{ fontSize: '1rem' }}>{localMeta.description.score}점</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              onClick={() => copyToClipboard(localMeta.description.text, 'desc')}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.75rem', fontSize: '0.8125rem' }}
+            >
+              {copied.desc ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+              {copied.desc ? '복사됨' : '복사'}
+            </button>
+            <span className="status-badge warning" style={{ fontSize: '1rem' }}>{localMeta.description.score}점</span>
+          </div>
         </div>
         <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
           미리보기: "{localMeta.description.preview_lines}"
@@ -409,7 +437,17 @@ JSON만 출력.`;
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.125rem', margin: 0 }}>
             <Tag size={18} /> 태그 ({localMeta.tags.list.length}개 / 약 {localMeta.tags.list.join(',').length}자)
           </h3>
-          <span className="status-badge success" style={{ fontSize: '1rem' }}>{localMeta.tags.score}점</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              onClick={() => copyToClipboard(localMeta.tags.list.join(','), 'tags')}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.75rem', fontSize: '0.8125rem' }}
+            >
+              {copied.tags ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+              {copied.tags ? '복사됨' : '복사'}
+            </button>
+            <span className="status-badge success" style={{ fontSize: '1rem' }}>{localMeta.tags.score}점</span>
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -567,8 +605,14 @@ JSON만 출력.`;
           {uploadStatus.videoId && (
             <>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-                <a href={`https://studio.youtube.com/video/${uploadStatus.videoId}/edit`} target="_blank" rel="noreferrer" className="btn-secondary" style={{ flex: 1, textDecoration: 'none', textAlign: 'center' }}>YouTube Studio 열기</a>
-                <a href={`https://youtube.com/watch?v=${uploadStatus.videoId}`} target="_blank" rel="noreferrer" className="btn-secondary" style={{ flex: 1, textDecoration: 'none', textAlign: 'center' }}>영상 보기</a>
+                {uploadStatus.videoId !== 'manual' ? (
+                  <>
+                    <a href={`https://studio.youtube.com/video/${uploadStatus.videoId}/edit`} target="_blank" rel="noreferrer" className="btn-secondary" style={{ flex: 1, textDecoration: 'none', textAlign: 'center' }}>YouTube Studio 열기</a>
+                    <a href={`https://youtube.com/watch?v=${uploadStatus.videoId}`} target="_blank" rel="noreferrer" className="btn-secondary" style={{ flex: 1, textDecoration: 'none', textAlign: 'center' }}>영상 보기</a>
+                  </>
+                ) : (
+                  <a href="https://studio.youtube.com" target="_blank" rel="noreferrer" className="btn-secondary" style={{ flex: 1, textDecoration: 'none', textAlign: 'center' }}>YouTube Studio 열기</a>
+                )}
                 <button className="btn-primary" style={{ flex: 1 }} onClick={onNext}>대시보드로 이동</button>
               </div>
 
@@ -655,6 +699,17 @@ JSON만 출력.`;
           {!videoFile && accessToken && (
             <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>영상 파일을 선택해주세요</span>
           )}
+          <button
+            className="btn-secondary"
+            onClick={() => {
+              // Mark as manually uploaded and show completion UI
+              setUploadStatus({ isUploading: false, percent: 100, text: '직접 업로드 완료', videoId: 'manual', error: null });
+              updateState('upload', { ...upload, uploadStatus: 'manual_complete' });
+            }}
+            style={{ fontSize: '1rem', padding: '0.75rem 1.5rem' }}
+          >
+            <CheckCircle2 size={20} style={{ marginRight: '0.5rem' }} /> 직접 업로드 완료
+          </button>
           <button
             className="btn-primary"
             onClick={executeUpload}

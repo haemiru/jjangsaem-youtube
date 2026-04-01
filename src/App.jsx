@@ -148,7 +148,7 @@ export default function App() {
             <UploadPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('dashboard')} setActiveTab={setActiveTab} />
           </div>
           <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
-            <DashboardPanel globalState={globalState} onNavigate={setActiveTab} />
+            <DashboardPanel globalState={globalState} onNavigate={setActiveTab} updateState={updateState} />
           </div>
 
         </main>
