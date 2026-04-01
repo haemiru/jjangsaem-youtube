@@ -174,12 +174,12 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
     // Thumbnails — skip for Shorts (Nick Invests style: white bg + cartoon character + bold text)
     if (!isShorts) {
       const thumbBasePrompt = script.thumbnailImagePrompts?.[0]?.prompt
-        || `YouTube thumbnail, 16:9 aspect ratio, clean white background, cute cartoon illustration style character on the left side showing expressive emotion, minimalist layout, no text in image, high contrast, simple and clean design like a whiteboard animation style`;
+        || `유튜브 썸네일, 16:9 비율, 깨끗한 순백색 배경, 귀여운 카툰 일러스트 캐릭터를 왼쪽에 배치, 감정이 풍부한 표정, 미니멀한 레이아웃, 높은 대비, 화이트보드 애니메이션 스타일, 이미지 내 모든 텍스트는 반드시 한국어로 작성`;
       const thumbAltPrompt = script.thumbnailImagePrompts?.[1]?.prompt
-        || thumbBasePrompt + ', different character pose and angle, alternative composition';
+        || thumbBasePrompt + ', 다른 포즈와 각도, 다른 구도';
 
-      items.push({ id: 'thumb_a', label: '썸네일 A', prompt: thumbBasePrompt, status: 'idle', url: null });
-      items.push({ id: 'thumb_b', label: '썸네일 B', prompt: thumbAltPrompt, status: 'idle', url: null });
+      items.push({ id: 'thumb_a', label: '썸네일 A', prompt: `${thumbBasePrompt}${suffix}`, status: 'idle', url: null });
+      items.push({ id: 'thumb_b', label: '썸네일 B', prompt: `${thumbAltPrompt}${suffix}`, status: 'idle', url: null });
     }
 
     const outroPrompt = script.outro_image_prompt
