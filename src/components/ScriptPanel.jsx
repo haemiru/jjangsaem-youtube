@@ -10,6 +10,7 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
 
   const [showHookCot, setShowHookCot] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  const [ttsSpeedLabel, setTtsSpeedLabel] = useState('1x');
   const [mode, setMode] = useState(null); // null: not chosen, 'auto', 'manual'
   const [manualStep, setManualStep] = useState(1); // 1: hook, 2: rows, 3: titles
   const [manualInput, setManualInput] = useState('');
@@ -757,20 +758,47 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
           '전문적': 'Speak in a calm, confident, and authoritative tone, like a pediatric neurologist explaining to parents. Clear articulation, steady pace, professional but approachable.',
           '교육적': 'Speak in a friendly and clear instructional tone, like a kind teacher explaining step by step. Bright and encouraging voice, slightly slower pace for clarity.'
         };
-        const styleText = ttsStyles[plan.tone] || ttsStyles['전문적'];
+        const speedInstructions = {
+          '1x': '',
+          '1.2x': ' Speak at a slightly faster pace than normal, about 1.2x speed.',
+          '1.5x': ' Speak at a noticeably faster pace, about 1.5x speed. Keep clarity while increasing tempo.',
+          '2x': ' Speak at a very fast pace, about 2x speed. Maintain clear pronunciation despite the rapid delivery.'
+        };
+        const baseStyle = ttsStyles[plan.tone] || ttsStyles['전문적'];
+        const styleText = baseStyle + (speedInstructions[ttsSpeedLabel] || '');
+        const speedOptions = ['1x', '1.2x', '1.5x', '2x'];
         return (
           <div style={{ border: '1px solid #3b82f6', borderRadius: 'var(--radius-md)', padding: '1.25rem', backgroundColor: '#eff6ff' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h3 style={{ fontSize: '1rem', margin: 0, color: '#1d4ed8' }}>
                 Google TTS Style Instructions ({plan.tone})
               </h3>
-              <button
-                className="btn-primary"
-                style={{ fontSize: '0.8125rem', padding: '0.375rem 0.75rem' }}
-                onClick={() => copyText(styleText, 'tts_style')}
-              >
-                {copiedId === 'tts_style' ? <><Check size={14}/> 복사됨</> : <><Copy size={14}/> 복사</>}
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                  {speedOptions.map(speed => (
+                    <button
+                      key={speed}
+                      onClick={() => setTtsSpeedLabel(speed)}
+                      style={{
+                        padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 600,
+                        border: ttsSpeedLabel === speed ? '2px solid #1d4ed8' : '1px solid #93c5fd',
+                        borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                        backgroundColor: ttsSpeedLabel === speed ? '#1d4ed8' : 'white',
+                        color: ttsSpeedLabel === speed ? 'white' : '#1d4ed8',
+                      }}
+                    >
+                      {speed}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="btn-primary"
+                  style={{ fontSize: '0.8125rem', padding: '0.375rem 0.75rem' }}
+                  onClick={() => copyText(styleText, 'tts_style')}
+                >
+                  {copiedId === 'tts_style' ? <><Check size={14}/> 복사됨</> : <><Copy size={14}/> 복사</>}
+                </button>
+              </div>
             </div>
             <div style={{ padding: '0.75rem', backgroundColor: 'white', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem', fontFamily: 'monospace', lineHeight: '1.6', color: '#374151' }}>
               {styleText}
