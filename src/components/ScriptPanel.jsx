@@ -225,17 +225,17 @@ ${structureGuide}
 [출력 규칙]
 1. 대본을 1~2문장 단위로 끊어서 rows 배열에 넣어줘 (총 ${lengthGuide.rows}개 row)
 2. 각 row에 section 필드를 반드시 포함 — 값은 ${isShorts ? '"hook", "explain", "core", "cta"' : '"hook", "empathy", "twist", "core", "solution", "cta"'} 중 하나
-3. 각 row의 image_prompt: 해당 문장을 시각화하는 이미지 생성 프롬프트 (한국어 문장으로 작성)
-   - 반드시 "흰색 배경" 포함
-   - 캐릭터가 등장하며 해당 내용을 설명하는 포즈/표정
-   - 대본 문장을 그대로 넣지 말 것 (하단에 자막으로 별도 표시됨)
-   - 대신 해당 내용의 핵심 키워드 1~2개를 한글 텍스트로 포함 (예: "미주신경"이라는 텍스트 포함, "코르티솔 ↓"이라는 텍스트 포함)
-   - 텍스트는 화면 상단~중앙(위쪽 70%)에 배치 — 하단 30%는 영상 자막 영역이므로 비워둘 것
-   - 이미지 안의 모든 텍스트는 반드시 한국어로 작성할 것
-4. 각 row의 video_prompt: 해당 이미지를 5초 영상으로 만들기 위한 영상 생성 프롬프트 (한국어 문장으로 작성)
-   - 카메라 움직임, 캐릭터 애니메이션, 텍스트 등장 효과 등 포함
+3. 각 row의 image_prompt: Write in ENGLISH. A prompt to visualize the sentence as an image.
+   - Must include "white background"
+   - Character appears with pose/expression explaining the content
+   - Do NOT put the script text directly (subtitles are shown separately at the bottom)
+   - Instead, include 1~2 key Korean text overlays for core keywords (e.g., include Korean text "미주신경", include Korean text "코르티솔 ↓")
+   - Text should be placed in upper~center area (top 70%) — leave bottom 30% empty for video subtitles
+   - Any visible text within the image MUST be in Korean
+4. 각 row의 video_prompt: Write in ENGLISH. A prompt to animate the image into a 5-second video.
+   - Include camera movement, character animation, text appearance effects, etc.
 
-⚠️ 중요: JSON 키(rows, section, script, image_prompt, video_prompt, full_script)는 반드시 영어 그대로 유지. 값(value)만 한국어로 작성.
+⚠️ 중요: image_prompt와 video_prompt 값은 반드시 영어로 작성. 단, 이미지 안에 표시될 텍스트만 한국어로 지정.
 
 JSON 출력:
 {
@@ -243,8 +243,8 @@ JSON 출력:
     {
       "section": "hook",
       "script": "대본 문장 (한국어)",
-      "image_prompt": "흰색 배경, 캐릭터가 놀란 표정으로 서 있고, '발달 신호'라는 텍스트가 상단에 표시됨",
-      "video_prompt": "카메라가 천천히 캐릭터에게 줌인, 텍스트가 페이드인으로 등장"
+      "image_prompt": "White background, cartoon character standing with surprised expression, Korean text '발달 신호' displayed at top center, minimal clean layout",
+      "video_prompt": "Camera slowly zooms into character, Korean text fades in from top, character's eyes widen"
     }
   ],
   "full_script": "전체 대본을 이어붙인 텍스트 (복사용)"
@@ -268,17 +268,16 @@ ${isShorts ? '' : `
 🔥 솔루션 유도형: 이 3가지만 보세요 / 지금 바로 확인하세요 / 5분이면 바뀝니다
 
 [썸네일 이미지 프롬프트 가이드 — Nick Invests 스타일 참고]
-A/B 테스트용으로 2개의 썸네일 이미지 생성 프롬프트를 한국어 문장으로 작성해줘.
-⚠️ JSON 키(variant, prompt, concept)는 영어 그대로 유지. prompt 값만 한국어로 작성.
-- 스타일: 깔끔한 흰색 배경 + 귀여운 카툰/일러스트 캐릭터 (화이트보드 애니메이션 스타일)
-- 캐릭터는 왼쪽 30%에 배치, 오른쪽 70%는 텍스트 오버레이 공간으로 비워둘 것
-- 이미지 안에 텍스트가 포함될 경우 반드시 한국어로 작성할 것 (영어 텍스트 절대 금지)
-- 캐릭터는 주제에 맞는 감정 표현 (놀람, 걱정, 기쁨, 확신 등)
-- 주제 관련 간단한 소품 1~2개 (화살표, 아이콘 등)
-- 극도로 미니멀하고 깔끔한 디자인, 높은 대비
-- A안: 캐릭터 + 감정 표현 중심
-- B안: 다른 포즈/감정 + 소품 변형
-- 프롬프트 예시: "유튜브 썸네일, 16:9 비율, 순백색 배경, 귀여운 카툰 캐릭터가 걱정스러운 표정으로..."
+Write 2 thumbnail image generation prompts in ENGLISH for A/B testing.
+- Style: clean white background + cute cartoon/illustration character (whiteboard animation style)
+- Character placed on left 30%, right 70% left empty for text overlay
+- Any visible text within the image MUST be in Korean (no English text in the image)
+- Character with emotion matching the topic (surprise, worry, joy, confidence, etc.)
+- 1~2 simple props related to the topic (arrows, icons, etc.)
+- Extremely minimal and clean design, high contrast
+- Variant A: character + emotion focused
+- Variant B: different pose/emotion + prop variation
+- Prompt example: "YouTube thumbnail, 16:9 aspect ratio, pure white background, cute cartoon character with worried expression..."
 `}
 아래 JSON 형식으로만 바로 출력해. thinking 태그 쓰지 마.
 {
@@ -293,8 +292,8 @@ A/B 테스트용으로 2개의 썸네일 이미지 생성 프롬프트를 한국
   ],
   "final_thumbnail_copy": "최종 추천 썸네일 문구 (2~4단어)",
   "thumbnail_image_prompts": [
-    { "variant": "A", "prompt": "유튜브 썸네일, 16:9 비율, 깨끗한 순백색 배경, 귀여운 카툰 일러스트 캐릭터를 왼쪽(화면의 30%)에 배치, 캐릭터는 [감정] 표정, 심플하고 미니멀한 레이아웃, 화이트보드 애니메이션 스타일, 높은 대비, [주제 관련 소품], 이미지 내 모든 텍스트는 반드시 한국어로 작성", "concept": "캐릭터 왼쪽 + 오른쪽 여백 (텍스트 영역)" },
-    { "variant": "B", "prompt": "유튜브 썸네일, 16:9 비율, 깨끗한 순백색 배경, 귀여운 카툰 일러스트 캐릭터를 왼쪽에 다른 포즈로 배치, [다른 감정] 표정, 주제 관련 간단한 소품, 미니멀하고 깔끔한 레이아웃, 화이트보드 애니메이션 스타일, 이미지 내 모든 텍스트는 반드시 한국어로 작성", "concept": "다른 포즈/감정의 캐릭터 + 소품" }
+    { "variant": "A", "prompt": "YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left (30% of frame), character with [emotion] expression, simple minimal layout, whiteboard animation style, high contrast, [topic-related prop], any visible text in the image must be in Korean", "concept": "Character left + right empty space (text overlay area)" },
+    { "variant": "B", "prompt": "YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left with different pose, [different emotion] expression, topic-related simple props, minimal clean layout, whiteboard animation style, any visible text in the image must be in Korean", "concept": "Different pose/emotion character + props" }
   ]`}
 }
 JSON만 출력. 다른 텍스트 절대 금지.`;

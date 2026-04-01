@@ -5,7 +5,7 @@ import { Image as ImageIcon, ArrowRight } from 'lucide-react';
 // import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
 // import { VideoGenerator } from '../services/videoGenerator';
 
-const COMMON_SUFFIX = ", 한국인 대상, 따뜻하고 전문적인 스타일, 깔끔한 배경, 고화질, 밝은 조명, 교육용 유튜브 콘텐츠에 적합, 이미지 안의 텍스트는 반드시 한국어로 작성할 것 (영어 텍스트 절대 금지), 텍스트는 화면 상단~중앙(위쪽 70%)에 배치하고 하단 30%에는 텍스트를 넣지 말 것 (영상 자막과 겹침 방지)";
+const COMMON_SUFFIX = ", for Korean audience, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content, any visible text in the image must be in Korean (no English text allowed), text should be placed in upper~center area (top 70%) and leave bottom 30% empty (to avoid overlapping with video subtitles)";
 
 const GEMINI_MODEL = 'gemini-3-pro-image-preview';
 const DELAY_BETWEEN_REQUESTS_MS = 3000;
@@ -23,7 +23,7 @@ async function generateImageWithGemini(prompt, referenceImage = null, retries = 
         const match = referenceImage.match(/^data:(image\/\w+);base64,(.+)$/);
         if (match) {
           reqParts.push({
-            text: `아래 참조 이미지의 캐릭터를 메인 캐릭터로 사용해줘. 캐릭터의 외모, 스타일, 특징을 일관되게 유지해줘.\n\n${prompt}`
+            text: `Use the character from the reference image below as the main character. Maintain consistent appearance, style, and features.\n\n${prompt}`
           });
           reqParts.push({
             inlineData: { mimeType: match[1], data: match[2] }
@@ -164,7 +164,7 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
     const items = [];
     const introPrompt = script.intro_image_prompt
       ? `${script.intro_image_prompt}${suffix}`
-      : `오프닝 타이틀 배경: ${script.hook}.${suffix}`;
+      : `Opening title background for: ${script.hook}.${suffix}`;
     items.push({ id: 'intro', label: '오프닝', prompt: introPrompt, status: 'idle', url: null });
 
     script.sections?.forEach((sec, idx) => {
@@ -174,9 +174,9 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
     // Thumbnails — skip for Shorts (Nick Invests style: white bg + cartoon character + bold text)
     if (!isShorts) {
       const thumbBasePrompt = script.thumbnailImagePrompts?.[0]?.prompt
-        || `유튜브 썸네일, 16:9 비율, 깨끗한 순백색 배경, 귀여운 카툰 일러스트 캐릭터를 왼쪽에 배치, 감정이 풍부한 표정, 미니멀한 레이아웃, 높은 대비, 화이트보드 애니메이션 스타일, 이미지 내 모든 텍스트는 반드시 한국어로 작성`;
+        || `YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left, expressive emotion, minimal layout, high contrast, whiteboard animation style, any visible text in the image must be in Korean`;
       const thumbAltPrompt = script.thumbnailImagePrompts?.[1]?.prompt
-        || thumbBasePrompt + ', 다른 포즈와 각도, 다른 구도';
+        || thumbBasePrompt + ', different pose and angle, different composition';
 
       items.push({ id: 'thumb_a', label: '썸네일 A', prompt: `${thumbBasePrompt}${suffix}`, status: 'idle', url: null });
       items.push({ id: 'thumb_b', label: '썸네일 B', prompt: `${thumbAltPrompt}${suffix}`, status: 'idle', url: null });
@@ -184,7 +184,7 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
 
     const outroPrompt = script.outro_image_prompt
       ? `${script.outro_image_prompt}${suffix}`
-      : `따뜻하고 깔끔한 엔딩 카드 배경, 부드러운 그라데이션, 은은한 반짝임 효과, 중앙에 한글 텍스트 영역, 감사 메시지와 채널 구독 유도에 적합.${suffix}`;
+      : `Warm and clean ending card background, soft gradient, subtle sparkle effects, Korean text area in center, suitable for thank you message and channel subscription CTA.${suffix}`;
     items.push({ id: 'outro', label: '엔딩', prompt: outroPrompt, status: 'idle', url: null });
 
     setQueue(items);
