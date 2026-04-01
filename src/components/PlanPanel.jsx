@@ -390,7 +390,7 @@ ${pdfText.substring(0, 20000)}`;
         />
         {data.characterImage && (
           <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-            <img src={data.characterImage} alt="캐릭터" style={{ width: '120px', height: '120px', objectFit: 'contain', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', backgroundColor: '#fff' }} />
+            <img src={data.characterImageUrl || data.characterImage} alt="캐릭터" style={{ width: '120px', height: '120px', objectFit: 'contain', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', backgroundColor: '#fff' }} />
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.25rem', display: 'block' }}>캐릭터 설명 (선택)</label>
               <textarea

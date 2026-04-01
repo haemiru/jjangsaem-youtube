@@ -13,6 +13,7 @@
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@google/generative-ai": "^0.24.1",
+    "firebase": "^12.11.0",
     "lucide-react": "^0.577.0",
     "pdfjs-dist": "^5.5.207",
     "react": "^19.2.4",

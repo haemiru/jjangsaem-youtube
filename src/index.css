@@ -375,3 +375,38 @@ textarea.form-control {
   background-color: #fef9c3;
   color: #854d0e;
 }
+
+/* Project action buttons */
+.project-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.project-action-btn:hover {
+  background-color: var(--gray-100);
+  color: var(--text-main);
+}
+
+.project-action-btn.delete:hover {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+/* Animate spin (for Loader2) */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
