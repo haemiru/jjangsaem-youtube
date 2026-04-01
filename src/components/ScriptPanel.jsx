@@ -225,13 +225,14 @@ ${structureGuide}
 [출력 규칙]
 1. 대본을 1~2문장 단위로 끊어서 rows 배열에 넣어줘 (총 ${lengthGuide.rows}개 row)
 2. 각 row에 section 필드를 반드시 포함 — 값은 ${isShorts ? '"hook", "explain", "core", "cta"' : '"hook", "empathy", "twist", "core", "solution", "cta"'} 중 하나
-3. 각 row의 image_prompt: 해당 문장을 시각화하는 이미지 생성 프롬프트 (영어로 작성)
-   - 반드시 "white background" 포함
+3. 각 row의 image_prompt: 해당 문장을 시각화하는 이미지 생성 프롬프트 (한국어로 작성, 영어 금지)
+   - 반드시 "흰색 배경" 포함
    - 캐릭터가 등장하며 해당 내용을 설명하는 포즈/표정
    - 대본 문장을 그대로 넣지 말 것 (하단에 자막으로 별도 표시됨)
-   - 대신 해당 내용의 핵심 키워드 1~2개를 한글 텍스트로 포함 (예: text reading "미주신경", text reading "코르티솔 ↓")
+   - 대신 해당 내용의 핵심 키워드 1~2개를 한글 텍스트로 포함 (예: "미주신경"이라는 텍스트 포함, "코르티솔 ↓"이라는 텍스트 포함)
    - 텍스트는 화면 상단~중앙(위쪽 70%)에 배치 — 하단 30%는 영상 자막 영역이므로 비워둘 것
-4. 각 row의 video_prompt: 해당 이미지를 5초 영상으로 만들기 위한 영상 생성 프롬프트 (영어로 작성)
+   - 이미지 안의 모든 텍스트는 반드시 한국어로 작성할 것
+4. 각 row의 video_prompt: 해당 이미지를 5초 영상으로 만들기 위한 영상 생성 프롬프트 (한국어로 작성, 영어 금지)
    - 카메라 움직임, 캐릭터 애니메이션, 텍스트 등장 효과 등 포함
 
 JSON 출력:
@@ -240,8 +241,8 @@ JSON 출력:
     {
       "section": "hook",
       "script": "대본 문장 (한국어)",
-      "image_prompt": "White background, character standing in ... pose ... (영어)",
-      "video_prompt": "Camera slowly zooms in on character ... (영어)"
+      "image_prompt": "흰색 배경, 캐릭터가 ... 포즈로 서 있는 모습 ... (한국어)",
+      "video_prompt": "카메라가 천천히 캐릭터에게 줌인 ... (한국어)"
     }
   ],
   "full_script": "전체 대본을 이어붙인 텍스트 (복사용)"
