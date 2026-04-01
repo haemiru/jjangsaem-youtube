@@ -45,10 +45,39 @@ const INIT_STATE = {
 // --- Context ---
 export const AppContext = createContext();
 
+// LocalStorage persistence
+const STORAGE_KEY = 'jjangsaem-yt-state';
+
+function loadSavedState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Merge with INIT_STATE to handle new fields
+      return Object.keys(INIT_STATE).reduce((acc, key) => {
+        acc[key] = { ...INIT_STATE[key], ...(parsed[key] || {}) };
+        return acc;
+      }, {});
+    }
+  } catch (e) {
+    console.warn('저장된 상태 복원 실패:', e);
+  }
+  return INIT_STATE;
+}
+
 // Main App
 export default function App() {
-  const [globalState, setGlobalState] = useState(INIT_STATE);
+  const [globalState, setGlobalState] = useState(loadSavedState);
   const [activeTab, setActiveTab] = useState('plan');
+
+  // Save state to localStorage on change
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(globalState));
+    } catch (e) {
+      console.warn('상태 저장 실패:', e);
+    }
+  }, [globalState]);
 
   const updateState = (section, payload) => {
     setGlobalState(prev => ({
