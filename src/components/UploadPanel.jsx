@@ -244,13 +244,20 @@ JSON만 출력.`;
         },
       });
 
-      // Upload thumbnail if available (file upload or media tab)
+      // Upload thumbnail if available
+      let thumbWarning = '';
       if (thumbnailPreview && thumbnailPreview.startsWith('data:')) {
         setUploadStatus(p => ({ ...p, percent: 95, text: '썸네일 적용 중...' }));
-        await setThumbnail(accessToken, videoId, thumbnailPreview);
+        try {
+          const thumbOk = await setThumbnail(accessToken, videoId, thumbnailPreview);
+          if (!thumbOk) thumbWarning = ' (썸네일은 YouTube Studio에서 직접 설정해주세요)';
+        } catch (e) {
+          console.warn('썸네일 업로드 실패 (CORS):', e);
+          thumbWarning = ' (썸네일은 YouTube Studio에서 직접 설정해주세요)';
+        }
       }
 
-      setUploadStatus({ isUploading: false, percent: 100, text: '업로드 완료!', videoId, error: '' });
+      setUploadStatus({ isUploading: false, percent: 100, text: '업로드 완료!' + thumbWarning, videoId, error: '' });
 
       updateState('upload', {
         ...globalState.upload,
