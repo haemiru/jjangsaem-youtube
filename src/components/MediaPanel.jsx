@@ -5,7 +5,7 @@ import { Image as ImageIcon, ArrowRight } from 'lucide-react';
 // import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
 // import { VideoGenerator } from '../services/videoGenerator';
 
-const COMMON_SUFFIX = ", 한국인 대상, 따뜻하고 전문적인 스타일, 깔끔한 배경, 고화질, 밝은 조명, 교육용 유튜브 콘텐츠에 적합, 이미지 안의 텍스트는 화면 상단~중앙(위쪽 70%)에 배치하고 하단 30%에는 텍스트를 넣지 말 것 (영상 자막과 겹침 방지)";
+const COMMON_SUFFIX = ", 한국인 대상, 따뜻하고 전문적인 스타일, 깔끔한 배경, 고화질, 밝은 조명, 교육용 유튜브 콘텐츠에 적합, 이미지 안의 텍스트는 반드시 한국어로 작성할 것 (영어 텍스트 절대 금지), 텍스트는 화면 상단~중앙(위쪽 70%)에 배치하고 하단 30%에는 텍스트를 넣지 말 것 (영상 자막과 겹침 방지)";
 
 const GEMINI_MODEL = 'gemini-3-pro-image-preview';
 const DELAY_BETWEEN_REQUESTS_MS = 3000;

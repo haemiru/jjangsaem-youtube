@@ -265,10 +265,10 @@ ${isShorts ? '' : `
 🔥 솔루션 유도형: 이 3가지만 보세요 / 지금 바로 확인하세요 / 5분이면 바뀝니다
 
 [썸네일 이미지 프롬프트 가이드 — Nick Invests 스타일 참고]
-A/B 테스트용으로 2개의 썸네일 이미지 생성 프롬프트를 영어로 작성해줘.
+A/B 테스트용으로 2개의 썸네일 이미지 생성 프롬프트를 한국어로 작성해줘.
 - 스타일: 깔끔한 흰색 배경 + 귀여운 카툰/일러스트 캐릭터 (화이트보드 애니메이션 스타일)
 - 캐릭터는 왼쪽 30%에 배치, 오른쪽 70%는 텍스트 오버레이 공간으로 비워둘 것
-- 이미지 안에 텍스트를 넣지 말 것 (텍스트는 별도 오버레이로 추가됨)
+- 이미지 안에 텍스트가 포함될 경우 반드시 한국어로 작성할 것 (영어 텍스트 절대 금지)
 - 캐릭터는 주제에 맞는 감정 표현 (놀람, 걱정, 기쁨, 확신 등)
 - 주제 관련 간단한 소품 1~2개 (화살표, 아이콘 등)
 - 극도로 미니멀하고 깔끔한 디자인, 높은 대비
@@ -288,8 +288,8 @@ A/B 테스트용으로 2개의 썸네일 이미지 생성 프롬프트를 영어
   ],
   "final_thumbnail_copy": "최종 추천 썸네일 문구 (2~4단어)",
   "thumbnail_image_prompts": [
-    { "variant": "A", "prompt": "YouTube thumbnail, 16:9, clean pure white background, cute cartoon illustration character on the LEFT side (30% of frame), character shows [감정] expression, simple minimalist layout, NO TEXT in image, whiteboard animation style, high contrast, [주제 관련 소품]", "concept": "캐릭터 왼쪽 + 오른쪽 여백 (텍스트 영역)" },
-    { "variant": "B", "prompt": "YouTube thumbnail, 16:9, clean pure white background, cute cartoon illustration character on the LEFT side with different pose, [다른 감정] expression, simple props related to topic, minimalist clean layout, NO TEXT in image, whiteboard animation style", "concept": "다른 포즈/감정의 캐릭터 + 소품" }
+    { "variant": "A", "prompt": "유튜브 썸네일, 16:9 비율, 깨끗한 순백색 배경, 귀여운 카툰 일러스트 캐릭터를 왼쪽(화면의 30%)에 배치, 캐릭터는 [감정] 표정, 심플하고 미니멀한 레이아웃, 화이트보드 애니메이션 스타일, 높은 대비, [주제 관련 소품], 이미지 내 모든 텍스트는 반드시 한국어로 작성", "concept": "캐릭터 왼쪽 + 오른쪽 여백 (텍스트 영역)" },
+    { "variant": "B", "prompt": "유튜브 썸네일, 16:9 비율, 깨끗한 순백색 배경, 귀여운 카툰 일러스트 캐릭터를 왼쪽에 다른 포즈로 배치, [다른 감정] 표정, 주제 관련 간단한 소품, 미니멀하고 깔끔한 레이아웃, 화이트보드 애니메이션 스타일, 이미지 내 모든 텍스트는 반드시 한국어로 작성", "concept": "다른 포즈/감정의 캐릭터 + 소품" }
   ]`}
 }
 JSON만 출력. 다른 텍스트 절대 금지.`;
