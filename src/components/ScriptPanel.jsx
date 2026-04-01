@@ -264,13 +264,16 @@ ${isShorts ? '' : `
 👶 부모 공감형: 우리 아이도 이랬어요? / 혹시 이런 모습 보이나요? / 이 행동, 많이 보셨죠? / 부모라면 꼭 보세요 / 이건 꼭 알아야 합니다
 🔥 솔루션 유도형: 이 3가지만 보세요 / 지금 바로 확인하세요 / 5분이면 바뀝니다
 
-[썸네일 이미지 프롬프트 가이드]
+[썸네일 이미지 프롬프트 가이드 — Nick Invests 스타일 참고]
 A/B 테스트용으로 2개의 썸네일 이미지 생성 프롬프트를 영어로 작성해줘.
-- 유튜브 썸네일 (16:9)에 최적화
-- 한글 텍스트는 그대로 포함 (예: bold Korean text reading "위험 신호")
-- 높은 대비, 깔끔한 디자인
-- A안: 인물/캐릭터 중심 레이아웃
-- B안: 텍스트/인포그래픽 중심 레이아웃
+- 스타일: 깔끔한 흰색 배경 + 귀여운 카툰/일러스트 캐릭터 (화이트보드 애니메이션 스타일)
+- 캐릭터는 왼쪽 30%에 배치, 오른쪽 70%는 텍스트 오버레이 공간으로 비워둘 것
+- 이미지 안에 텍스트를 넣지 말 것 (텍스트는 별도 오버레이로 추가됨)
+- 캐릭터는 주제에 맞는 감정 표현 (놀람, 걱정, 기쁨, 확신 등)
+- 주제 관련 간단한 소품 1~2개 (화살표, 아이콘 등)
+- 극도로 미니멀하고 깔끔한 디자인, 높은 대비
+- A안: 캐릭터 + 감정 표현 중심
+- B안: 다른 포즈/감정 + 소품 변형
 `}
 아래 JSON 형식으로만 바로 출력해. thinking 태그 쓰지 마.
 {
@@ -281,12 +284,12 @@ A/B 테스트용으로 2개의 썸네일 이미지 생성 프롬프트를 영어
   "final_title": "최종 추천 제목"${isShorts ? '' : `,
   "thumbnail_cot_log": "썸네일 선정 근거 + 어떤 레퍼런스 패턴을 참고했는지 2~3문장",
   "thumbnail_candidates": [
-    { "text": "문구", "score": 90, "reason": "참고한 레퍼런스 번호 + 한줄평" }
+    { "text": "문구 (2~4단어, 굵은 글씨에 적합한 짧고 임팩트 있는 텍스트)", "score": 90, "reason": "참고한 레퍼런스 번호 + 한줄평" }
   ],
-  "final_thumbnail_copy": "최종 추천 썸네일 문구",
+  "final_thumbnail_copy": "최종 추천 썸네일 문구 (2~4단어)",
   "thumbnail_image_prompts": [
-    { "variant": "A", "prompt": "YouTube thumbnail, 16:9, ... (영어 프롬프트)", "concept": "인물 중심 — 한줄 설명" },
-    { "variant": "B", "prompt": "YouTube thumbnail, 16:9, ... (영어 프롬프트)", "concept": "텍스트 중심 — 한줄 설명" }
+    { "variant": "A", "prompt": "YouTube thumbnail, 16:9, clean pure white background, cute cartoon illustration character on the LEFT side (30% of frame), character shows [감정] expression, simple minimalist layout, NO TEXT in image, whiteboard animation style, high contrast, [주제 관련 소품]", "concept": "캐릭터 왼쪽 + 오른쪽 여백 (텍스트 영역)" },
+    { "variant": "B", "prompt": "YouTube thumbnail, 16:9, clean pure white background, cute cartoon illustration character on the LEFT side with different pose, [다른 감정] expression, simple props related to topic, minimalist clean layout, NO TEXT in image, whiteboard animation style", "concept": "다른 포즈/감정의 캐릭터 + 소품" }
   ]`}
 }
 JSON만 출력. 다른 텍스트 절대 금지.`;

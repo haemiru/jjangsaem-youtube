@@ -111,13 +111,13 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
   // Image preview modal
   const [previewItem, setPreviewItem] = useState(null);
 
-  // Thumbnail overlay settings
+  // Thumbnail overlay settings (Nick Invests style: bold black text on white bg)
   const [thumbSettings, setThumbSettings] = useState({
     text: script.final_thumbnail_copy || '',
-    size: 40,
-    position: 'bottom',
-    color: '#FFFFFF',
-    dim: 30
+    size: 56,
+    position: 'middle',
+    color: '#000000',
+    dim: 0
   });
 
   // Timeline for video
@@ -171,13 +171,15 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
       items.push({ id: `section_${idx}`, label: `섹션${idx+1}`, prompt: `${sec.image_prompt}${suffix}`, status: 'idle', url: null });
     });
 
-    // Thumbnails — skip for Shorts
+    // Thumbnails — skip for Shorts (Nick Invests style: white bg + cartoon character + bold text)
     if (!isShorts) {
-      const domColors = benchmark?.thumbnailPatterns?.dominantColors?.join(', ') || '따뜻한 톤';
-      const thumbPrompt = `걱정과 희망이 교차하는 표정의 한국인 엄마, ${domColors} 배경, 아이가 뒤에 보임.${suffix}`;
+      const thumbBasePrompt = script.thumbnailImagePrompts?.[0]?.prompt
+        || `YouTube thumbnail, 16:9 aspect ratio, clean white background, cute cartoon illustration style character on the left side showing expressive emotion, minimalist layout, no text in image, high contrast, simple and clean design like a whiteboard animation style`;
+      const thumbAltPrompt = script.thumbnailImagePrompts?.[1]?.prompt
+        || thumbBasePrompt + ', different character pose and angle, alternative composition';
 
-      items.push({ id: 'thumb_a', label: '썸네일 A', prompt: thumbPrompt, status: 'idle', url: null });
-      items.push({ id: 'thumb_b', label: '썸네일 B', prompt: thumbPrompt + ' 다른 각도와 구도.', status: 'idle', url: null });
+      items.push({ id: 'thumb_a', label: '썸네일 A', prompt: thumbBasePrompt, status: 'idle', url: null });
+      items.push({ id: 'thumb_b', label: '썸네일 B', prompt: thumbAltPrompt, status: 'idle', url: null });
     }
 
     const outroPrompt = script.outro_image_prompt
@@ -414,8 +416,10 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
       ctx.font = `bold ${thumbSettings.size * (1280 / 600)}px 'Noto Sans KR', sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillStyle = thumbSettings.color;
-      ctx.shadowColor = 'rgba(0,0,0,0.8)';
-      ctx.shadowBlur = 8;
+      // Adaptive shadow: light shadow for dark text, dark shadow for light text
+      const isDarkText = thumbSettings.color === '#000000' || thumbSettings.color === '#000';
+      ctx.shadowColor = isDarkText ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.8)';
+      ctx.shadowBlur = isDarkText ? 0 : 8;
 
       const textY = thumbSettings.position === 'top' ? 150
         : thumbSettings.position === 'middle' ? 360 : 570;
