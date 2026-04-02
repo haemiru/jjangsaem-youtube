@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Image as ImageIcon, ArrowRight, Loader2 } from 'lucide-react';
-
-// Legacy imports kept for future re-enablement
-// import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
+import { Image as ImageIcon, ArrowRight, Loader2, StopCircle, RotateCw, AlertCircle, Play } from 'lucide-react';
+import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
 // import { VideoGenerator } from '../services/videoGenerator';
 
 const COMMON_SUFFIX = ", for Korean audience, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content, do not include any text or letters in the image, leave bottom 30% empty (to avoid overlapping with video subtitles)";
