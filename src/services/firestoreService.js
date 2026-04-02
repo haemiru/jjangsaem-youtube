@@ -8,6 +8,29 @@ import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 const PROJECTS_COL = 'projects';
 
+// Firestore doesn't support nested arrays. Serialize complex sections as JSON strings.
+const JSON_FIELDS = ['benchmark', 'script', 'metadata', 'seriesPlan'];
+
+function serializeForFirestore(data) {
+  const out = { ...data };
+  for (const key of JSON_FIELDS) {
+    if (out[key] !== undefined) {
+      out[key] = JSON.stringify(out[key]);
+    }
+  }
+  return out;
+}
+
+function deserializeFromFirestore(data) {
+  const out = { ...data };
+  for (const key of JSON_FIELDS) {
+    if (typeof out[key] === 'string') {
+      try { out[key] = JSON.parse(out[key]); } catch {}
+    }
+  }
+  return out;
+}
+
 // --- Auth ---
 export function signInAnon() {
   return new Promise((resolve, reject) => {
@@ -26,16 +49,19 @@ export function signInAnon() {
 
 // --- Projects CRUD ---
 export async function createProject(uid, name, initialState) {
-  const docRef = await addDoc(collection(db, PROJECTS_COL), {
-    uid,
-    name,
-    activeTab: 'plan',
+  const serialized = serializeForFirestore({
     plan: initialState.plan,
     benchmark: initialState.benchmark,
     script: initialState.script,
     metadata: initialState.metadata,
     upload: initialState.upload,
     seriesPlan: initialState.seriesPlan,
+  });
+  const docRef = await addDoc(collection(db, PROJECTS_COL), {
+    uid,
+    name,
+    activeTab: 'plan',
+    ...serialized,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -48,7 +74,7 @@ export async function listProjects(uid) {
     where('uid', '==', uid)
   );
   const snap = await getDocs(q);
-  const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const list = snap.docs.map(d => deserializeFromFirestore({ id: d.id, ...d.data() }));
   // Sort client-side to avoid composite index requirement
   list.sort((a, b) => {
     const ta = a.updatedAt?.toMillis?.() || 0;
@@ -61,12 +87,13 @@ export async function listProjects(uid) {
 export async function loadProject(projectId) {
   const snap = await getDoc(doc(db, PROJECTS_COL, projectId));
   if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() };
+  return deserializeFromFirestore({ id: snap.id, ...snap.data() });
 }
 
 export async function saveProject(projectId, data) {
+  const serialized = serializeForFirestore(data);
   await setDoc(doc(db, PROJECTS_COL, projectId), {
-    ...data,
+    ...serialized,
     updatedAt: serverTimestamp(),
   }, { merge: true });
 }

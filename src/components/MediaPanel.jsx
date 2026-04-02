@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Image as ImageIcon, ArrowRight, Loader2, StopCircle, RotateCw, AlertCircle, Play } from 'lucide-react';
+import { Image as ImageIcon, ArrowRight, Loader2, StopCircle, RotateCw, AlertCircle, Play, Upload } from 'lucide-react';
 import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
 // import { VideoGenerator } from '../services/videoGenerator';
 
