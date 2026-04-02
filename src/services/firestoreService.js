@@ -9,7 +9,7 @@ import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 const PROJECTS_COL = 'projects';
 
 // Firestore doesn't support nested arrays. Serialize complex sections as JSON strings.
-const JSON_FIELDS = ['benchmark', 'script', 'metadata', 'seriesPlan'];
+const JSON_FIELDS = ['plan', 'benchmark', 'script', 'metadata', 'upload', 'seriesPlan'];
 
 function serializeForFirestore(data) {
   const out = { ...data };
