@@ -3,7 +3,7 @@ import { Image as ImageIcon, ArrowRight, Loader2, StopCircle, RotateCw, AlertCir
 import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
 import { VideoGenerator } from '../services/videoGenerator';
 
-const COMMON_SUFFIX = ", for Korean audience, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content, do not include any text or letters in the image, leave bottom 30% empty (to avoid overlapping with video subtitles)";
+const COMMON_SUFFIX = ", for Korean audience, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content, avoid placing important elements in the bottom 15% area";
 
 const GEMINI_MODEL = 'gemini-3-pro-image-preview';
 const DELAY_BETWEEN_REQUESTS_MS = 3000;
@@ -264,7 +264,13 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
     imageSources.forEach((sec, idx) => {
       if (!sec.image_prompt) return;
       const sectionLabel = sec.section ? `${sec.section}` : `섹션${idx+1}`;
-      items.push({ id: `section_${idx}`, label: sectionLabel, prompt: `${sec.image_prompt}${suffix}`, status: 'idle', url: null });
+      const keyword = sec.keyword || sec.script || '';
+      // 키워드가 길면 앞부분만 사용 (최대 20자)
+      const shortKeyword = keyword.length > 20 ? keyword.substring(0, 20).replace(/[,.]$/, '') : keyword;
+      const keywordInstruction = shortKeyword
+        ? `. IMPORTANT: Include the following Korean text (한글) as overlay text in the upper area of the image: "${shortKeyword}". The text MUST be written in Korean (한글), NOT in English or any other language. Display the Korean text prominently and clearly readable.`
+        : '';
+      items.push({ id: `section_${idx}`, label: sectionLabel, prompt: `${sec.image_prompt}${keywordInstruction}${suffix}`, status: 'idle', url: null });
     });
 
     // Thumbnails — skip for Shorts (Nick Invests style: white bg + cartoon character + bold text)
