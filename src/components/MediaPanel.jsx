@@ -1051,14 +1051,15 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
             </div>
           )}
 
-          {/* 다음 단계 버튼 */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-            <button className="btn-primary" onClick={onNext}>
-              업로드 단계로 이동 <ArrowRight size={18} />
-            </button>
-          </div>
         </>
       )}
+
+      {/* 다음 단계 버튼 — 항상 표시 */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+        <button className="btn-primary" onClick={onNext}>
+          업로드 단계로 이동 <ArrowRight size={18} />
+        </button>
+      </div>
 
       {/* Image Preview Modal */}
       {previewItem && (
