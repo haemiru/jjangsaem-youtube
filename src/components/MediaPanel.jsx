@@ -393,6 +393,20 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
     reader.readAsDataURL(file);
   };
 
+  // Download all completed images
+  const downloadAllImages = () => {
+    const completed = queue.filter(q => q.status === 'done' && q.url);
+    completed.forEach((item, i) => {
+      const link = document.createElement('a');
+      link.href = item.url;
+      const ext = item.url.startsWith('data:image/png') ? 'png' : item.url.startsWith('data:image/webp') ? 'webp' : 'jpg';
+      link.download = `${String(i + 1).padStart(2, '0')}_${item.id}.${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  };
+
   const completedCount = queue.filter(q => q.status === 'done').length;
   const errorCount = queue.filter(q => q.status === 'error').length;
   const isAllCompleted = completedCount === queue.length && queue.length > 0;
@@ -604,8 +618,14 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
     <div className="panel-card" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 className="panel-title" style={{ margin: 0 }}>시각 자료 생성 & 합성</h2>
-        {!isAllCompleted && (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {completedCount > 0 && !isGenerating && (
+            <button className="btn-secondary" onClick={downloadAllImages}>
+              <Download size={18} /> 전체 다운로드 ({completedCount})
+            </button>
+          )}
+          {!isAllCompleted && (
+            <>
             {isGenerating && (
               <button
                 className="btn-secondary"
@@ -624,8 +644,9 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
               {isGenerating ? <RotateCw className="animate-spin" size={18} /> : <ImageIcon size={18} />}
               {isGenerating ? '이미지 생성 중...' : completedCount > 0 ? '이미지 이어서 생성' : '전체 이미지 생성'}
             </button>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Model Selection */}
