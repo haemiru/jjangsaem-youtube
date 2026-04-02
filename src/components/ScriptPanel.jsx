@@ -591,7 +591,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         )}
 
         <button className="btn-secondary" onClick={onNext} style={{ marginTop: '1rem', opacity: 0.7 }}>
-          건너뛰고 업로드 단계 →
+          건너뛰고 미디어 단계 →
         </button>
       </div>
     );
@@ -952,7 +952,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
         <button className="btn-primary" onClick={onNext}>
-          확정 후 업로드 단계 <ArrowRight size={20} />
+          확정 후 미디어 단계 <ArrowRight size={20} />
         </button>
       </div>
 

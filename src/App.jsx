@@ -396,7 +396,7 @@ export default function App() {
                 <BenchmarkPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('script')} />
               </div>
               <div style={{ display: activeTab === 'script' ? 'block' : 'none' }}>
-                <ScriptPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('upload')} />
+                <ScriptPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('media')} />
               </div>
               <div style={{ display: activeTab === 'media' ? 'block' : 'none' }}>
                 <MediaPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('upload')} />
