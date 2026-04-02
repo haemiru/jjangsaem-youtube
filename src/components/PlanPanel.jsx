@@ -371,40 +371,6 @@ ${pdfText.substring(0, 20000)}`;
         </div>
       </div>
 
-      <div className="form-group" style={{ padding: '1rem', border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--secondary)' }}>
-        <label className="form-label" style={{ color: 'var(--primary)' }}>캐릭터 이미지 업로드</label>
-        <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
-          영상에 사용할 캐릭터 이미지를 업로드하세요. 흰 배경 + 캐릭터 스타일의 이미지/영상 프롬프트에 반영됩니다.
-        </p>
-        <input
-          type="file"
-          accept="image/*"
-          className="form-control"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => handleChange('characterImage', ev.target.result);
-            reader.readAsDataURL(file);
-          }}
-        />
-        {data.characterImage && (
-          <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-            <img src={data.characterImageUrl || data.characterImage} alt="캐릭터" style={{ width: '120px', height: '120px', objectFit: 'contain', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', backgroundColor: '#fff' }} />
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.25rem', display: 'block' }}>캐릭터 설명 (선택)</label>
-              <textarea
-                className="form-control"
-                style={{ minHeight: '80px', fontSize: '0.875rem' }}
-                value={data.characterDescription || ''}
-                onChange={(e) => handleChange('characterDescription', e.target.value)}
-                placeholder="예: 둥근 얼굴의 귀여운 여자 캐릭터, 하얀 가운을 입고 있음"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
       <div className="form-group">
         <label className="form-label">톤앤매너</label>
         <div className="radio-group">

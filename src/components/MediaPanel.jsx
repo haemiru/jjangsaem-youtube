@@ -240,8 +240,8 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
   // Prompt editing for image cards
   const [editingPromptId, setEditingPromptId] = useState(null);
 
-  // Character reference image — auto-load from plan if available
-  const [characterRef, setCharacterRef] = useState(plan?.characterImageUrl || plan?.characterImage || null);
+  // Character reference image
+  const [characterRef, setCharacterRef] = useState(null);
 
   // Image generation model selection
   const [imageModel, setImageModel] = useState('gemini'); // 'gemini' | 'flux-schnell' | 'flux-pro'
