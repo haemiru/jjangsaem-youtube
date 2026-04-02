@@ -84,24 +84,30 @@ const FLUX_MODELS = {
   'flux-pro': 'black-forest-labs/flux-1.1-pro',
 };
 
-async function generateImageWithReplicate(prompt, modelKey, retries = 3) {
+async function generateImageWithReplicate(prompt, modelKey, referenceImage = null, retries = 3) {
   const modelVersion = FLUX_MODELS[modelKey];
   if (!modelVersion) throw new Error(`Unknown model: ${modelKey}`);
 
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
+      // 1. Build input
+      const input = {
+        prompt,
+        aspect_ratio: '16:9',
+        output_format: 'webp',
+        output_quality: 90,
+      };
+
+      // FLUX 1.1 Pro supports image_prompt for reference image guidance
+      if (modelKey === 'flux-pro' && referenceImage) {
+        input.image_prompt = referenceImage;
+      }
+
       // 1. Create prediction
       const createRes = await fetch('/api/replicate/models/' + modelVersion + '/predictions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input: {
-            prompt,
-            aspect_ratio: '16:9',
-            output_format: 'webp',
-            output_quality: 90,
-          },
-        }),
+        body: JSON.stringify({ input }),
       });
 
       if (!createRes.ok) {
@@ -303,7 +309,7 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
       try {
         const dataUrl = imageModel === 'gemini'
           ? await generateImageWithGemini(newQueue[i].prompt, characterRef)
-          : await generateImageWithReplicate(newQueue[i].prompt, imageModel);
+          : await generateImageWithReplicate(newQueue[i].prompt, imageModel, characterRef);
         newQueue[i].url = dataUrl;
         newQueue[i].status = 'done';
       } catch (err) {
@@ -357,7 +363,7 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
     try {
       const dataUrl = imageModel === 'gemini'
         ? await generateImageWithGemini(newQueue[idx].prompt, characterRef)
-        : await generateImageWithReplicate(newQueue[idx].prompt, imageModel);
+        : await generateImageWithReplicate(newQueue[idx].prompt, imageModel, characterRef);
       newQueue[idx].url = dataUrl;
       newQueue[idx].status = 'done';
     } catch (err) {
@@ -625,7 +631,7 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
           {[
             { id: 'gemini', label: 'Gemini', desc: '캐릭터 참조 지원' },
             { id: 'flux-schnell', label: 'FLUX Schnell', desc: '빠름 · ~$0.003/장' },
-            { id: 'flux-pro', label: 'FLUX 1.1 Pro', desc: '고품질 · ~$0.04/장' },
+            { id: 'flux-pro', label: 'FLUX 1.1 Pro', desc: '고품질 · 참조이미지 지원 · ~$0.04/장' },
           ].map(m => (
             <label key={m.id} className={`radio-label ${imageModel === m.id ? 'selected' : ''}`} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.125rem', padding: '0.5rem 0.75rem' }}>
               <input type="radio" className="radio-input" checked={imageModel === m.id} onChange={() => setImageModel(m.id)} disabled={isGenerating} />
@@ -634,9 +640,9 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
             </label>
           ))}
         </div>
-        {imageModel !== 'gemini' && (
+        {imageModel === 'flux-schnell' && (
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            FLUX 모델은 캐릭터 참조 이미지를 지원하지 않습니다. 프롬프트만으로 생성됩니다.
+            FLUX Schnell은 캐릭터 참조 이미지를 지원하지 않습니다. 프롬프트만으로 생성됩니다.
           </p>
         )}
       </div>
