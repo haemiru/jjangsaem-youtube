@@ -756,9 +756,14 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
                     <RotateCw className="animate-spin" size={24} color="var(--primary)" />
                   </div>
                 ) : (
-                  <label style={{ height: '120px', backgroundColor: 'var(--gray-100)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: '0.25rem' }}>
+                  <label
+                    style={{ height: '120px', backgroundColor: 'var(--gray-100)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: '0.25rem', border: '2px dashed transparent', transition: 'border-color 0.2s' }}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'var(--gray-200)'; }}
+                    onDragLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'var(--gray-100)'; }}
+                    onDrop={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'var(--gray-100)'; const file = e.dataTransfer.files[0]; if (file) uploadImage(item.id, file); }}
+                  >
                     <Upload size={20} color="var(--text-muted)" />
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>이미지 업로드</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>클릭 또는 끌어다 놓기</span>
                     <input type="file" accept="image/*" hidden onChange={(e) => uploadImage(item.id, e.target.files[0])} />
                   </label>
                 )}
