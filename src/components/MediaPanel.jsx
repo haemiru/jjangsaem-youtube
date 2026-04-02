@@ -259,8 +259,12 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
       : `Opening title background for: ${script.hook}.${suffix}`;
     items.push({ id: 'intro', label: '오프닝', prompt: introPrompt, status: 'idle', url: null });
 
-    script.sections?.forEach((sec, idx) => {
-      items.push({ id: `section_${idx}`, label: `섹션${idx+1}`, prompt: `${sec.image_prompt}${suffix}`, status: 'idle', url: null });
+    // Use sections if available, otherwise fall back to rows
+    const imageSources = script.sections?.length > 0 ? script.sections : (script.rows || []);
+    imageSources.forEach((sec, idx) => {
+      if (!sec.image_prompt) return;
+      const sectionLabel = sec.section ? `${sec.section}` : `섹션${idx+1}`;
+      items.push({ id: `section_${idx}`, label: sectionLabel, prompt: `${sec.image_prompt}${suffix}`, status: 'idle', url: null });
     });
 
     // Thumbnails — skip for Shorts (Nick Invests style: white bg + cartoon character + bold text)
