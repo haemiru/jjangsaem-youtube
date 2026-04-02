@@ -399,7 +399,7 @@ export default function App() {
                 <ScriptPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('upload')} />
               </div>
               <div style={{ display: activeTab === 'media' ? 'block' : 'none' }}>
-                <MediaPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('upload')} disabled={true} />
+                <MediaPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('upload')} />
               </div>
               <div style={{ display: activeTab === 'upload' ? 'block' : 'none' }}>
                 <UploadPanel globalState={globalState} updateState={updateState} onNext={() => setActiveTab('dashboard')} setActiveTab={setActiveTab} />

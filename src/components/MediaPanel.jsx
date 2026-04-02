@@ -1,5 +1,5 @@
-import React from 'react';
-import { Image as ImageIcon, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Image as ImageIcon, ArrowRight, Loader2 } from 'lucide-react';
 
 // Legacy imports kept for future re-enablement
 // import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
@@ -81,6 +81,91 @@ async function generateImageWithGemini(prompt, referenceImage = null, retries = 
   }
 }
 
+const FLUX_MODELS = {
+  'flux-schnell': 'black-forest-labs/flux-schnell',
+  'flux-pro': 'black-forest-labs/flux-1.1-pro',
+};
+
+async function generateImageWithReplicate(prompt, modelKey, retries = 3) {
+  const modelVersion = FLUX_MODELS[modelKey];
+  if (!modelVersion) throw new Error(`Unknown model: ${modelKey}`);
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      // 1. Create prediction
+      const createRes = await fetch('/api/replicate/models/' + modelVersion + '/predictions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: {
+            prompt,
+            aspect_ratio: '16:9',
+            output_format: 'webp',
+            output_quality: 90,
+          },
+        }),
+      });
+
+      if (!createRes.ok) {
+        const errText = await createRes.text();
+        if (createRes.status === 429 && attempt < retries - 1) {
+          await new Promise(r => setTimeout(r, Math.pow(2, attempt + 1) * 2000));
+          continue;
+        }
+        throw new Error(`Replicate API 오류 (${createRes.status}): ${errText.substring(0, 200)}`);
+      }
+
+      const prediction = await createRes.json();
+
+      // 2. Poll for completion (max 120 seconds)
+      const pollUrl = `/api/replicate/predictions/${prediction.id}`;
+      const maxWait = 120000;
+      const pollInterval = 1500;
+      const startTime = Date.now();
+
+      while (Date.now() - startTime < maxWait) {
+        await new Promise(r => setTimeout(r, pollInterval));
+
+        const pollRes = await fetch(pollUrl);
+        if (!pollRes.ok) continue;
+
+        const status = await pollRes.json();
+
+        if (status.status === 'succeeded') {
+          // 3. Fetch image and convert to base64
+          const output = Array.isArray(status.output) ? status.output[0] : status.output;
+          if (!output) throw new Error('이미지 URL이 없습니다');
+
+          const imgRes = await fetch(output);
+          const blob = await imgRes.blob();
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        }
+
+        if (status.status === 'failed') {
+          throw new Error(`이미지 생성 실패: ${status.error || 'unknown error'}`);
+        }
+
+        if (status.status === 'canceled') {
+          throw new Error('이미지 생성이 취소되었습니다');
+        }
+      }
+
+      throw new Error('이미지 생성 시간 초과 (120초)');
+    } catch (err) {
+      if (attempt < retries - 1) {
+        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 export default function MediaPanel({ globalState, updateState, onNext, disabled }) {
   // Disabled mode - show placeholder
   if (disabled) {
@@ -154,6 +239,9 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
   // Character reference image
   const [characterRef, setCharacterRef] = useState(null); // data URL
 
+  // Image generation model selection
+  const [imageModel, setImageModel] = useState('gemini'); // 'gemini' | 'flux-schnell' | 'flux-pro'
+
   // Initialize queue
   useEffect(() => {
     if (!script.hook) return;
@@ -215,7 +303,9 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
       setQueue([...newQueue]);
 
       try {
-        const dataUrl = await generateImageWithGemini(newQueue[i].prompt, characterRef);
+        const dataUrl = imageModel === 'gemini'
+          ? await generateImageWithGemini(newQueue[i].prompt, characterRef)
+          : await generateImageWithReplicate(newQueue[i].prompt, imageModel);
         newQueue[i].url = dataUrl;
         newQueue[i].status = 'done';
       } catch (err) {
@@ -226,9 +316,10 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
 
       setQueue([...newQueue]);
 
-      // Rate limiting delay between requests
+      // Rate limiting delay between requests (shorter for Replicate)
+      const delay = imageModel === 'gemini' ? DELAY_BETWEEN_REQUESTS_MS : 500;
       if (i < newQueue.length - 1 && newQueue[i].status === 'done') {
-        await new Promise(r => setTimeout(r, DELAY_BETWEEN_REQUESTS_MS));
+        await new Promise(r => setTimeout(r, delay));
       }
     }
 
@@ -266,7 +357,9 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
     setQueue([...newQueue]);
 
     try {
-      const dataUrl = await generateImageWithGemini(newQueue[idx].prompt, characterRef);
+      const dataUrl = imageModel === 'gemini'
+        ? await generateImageWithGemini(newQueue[idx].prompt, characterRef)
+        : await generateImageWithReplicate(newQueue[idx].prompt, imageModel);
       newQueue[idx].url = dataUrl;
       newQueue[idx].status = 'done';
     } catch (err) {
@@ -524,6 +617,29 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
               {isGenerating ? '이미지 생성 중...' : completedCount > 0 ? '이미지 이어서 생성' : '전체 이미지 생성'}
             </button>
           </div>
+        )}
+      </div>
+
+      {/* Model Selection */}
+      <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--gray-100)' }}>
+        <label className="form-label" style={{ marginBottom: '0.5rem' }}>이미지 생성 모델</label>
+        <div className="radio-group">
+          {[
+            { id: 'gemini', label: 'Gemini', desc: '캐릭터 참조 지원' },
+            { id: 'flux-schnell', label: 'FLUX Schnell', desc: '빠름 · ~$0.003/장' },
+            { id: 'flux-pro', label: 'FLUX 1.1 Pro', desc: '고품질 · ~$0.04/장' },
+          ].map(m => (
+            <label key={m.id} className={`radio-label ${imageModel === m.id ? 'selected' : ''}`} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.125rem', padding: '0.5rem 0.75rem' }}>
+              <input type="radio" className="radio-input" checked={imageModel === m.id} onChange={() => setImageModel(m.id)} disabled={isGenerating} />
+              <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{m.label}</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{m.desc}</span>
+            </label>
+          ))}
+        </div>
+        {imageModel !== 'gemini' && (
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+            FLUX 모델은 캐릭터 참조 이미지를 지원하지 않습니다. 프롬프트만으로 생성됩니다.
+          </p>
         )}
       </div>
 

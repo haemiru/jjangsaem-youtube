@@ -4,6 +4,7 @@
     { "source": "/api/youtube/(.*)", "destination": "/api/youtube" },
     { "source": "/api/gemini/(.*)", "destination": "/api/gemini" },
     { "source": "/api/tts/(.*)", "destination": "/api/tts" },
+    { "source": "/api/replicate/(.*)", "destination": "/api/replicate" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
