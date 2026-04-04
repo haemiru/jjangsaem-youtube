@@ -260,12 +260,13 @@ JSON만 출력.`;
 [핵심 태그] ${(benchmark?.tagPool || []).slice(0, 10).join(', ')}
 [포맷] ${plan.format}
 ${isShorts ? '' : `
-[검증된 고CTR 썸네일 문구 레퍼런스 — 이 패턴을 참고해 주제에 맞게 변형/조합할 것]
-🔥 불안 자극형: 이거… 괜찮은 걸까요? / 이 행동, 위험 신호입니다 / 그냥 두면 늦습니다 / 많은 부모가 놓칩니다 / 정상처럼 보여도 아닙니다 / 지금 놓치면 늦어요 / 대부분 모르고 지나갑니다 / 이건 기다리면 안됩니다
-🧠 전문가 포지셔닝형: 문제는 행동이 아닙니다 / 아이 뇌 상태입니다 / 신경계가 무너진 신호 / 미주신경이 닫혔습니다 / 발달이 멈춘 이유 / 뇌가 멈춘 상태입니다
-⚡ 구분/판별형: 정상 vs 위험 차이 / 자폐 vs 정상 구분법 / 기다려도 되는 아이 vs 아닌 아이 / 단순 행동 vs 위험 신호 / 멍함 vs freeze 차이
-👶 부모 공감형: 우리 아이도 이랬어요? / 혹시 이런 모습 보이나요? / 이 행동, 많이 보셨죠? / 부모라면 꼭 보세요 / 이건 꼭 알아야 합니다
-🔥 솔루션 유도형: 이 3가지만 보세요 / 지금 바로 확인하세요 / 5분이면 바뀝니다
+[검증된 고CTR 썸네일 문구 레퍼런스 — Nick Invests 스타일: 1~3단어 키워드형, 문장 금지, 임팩트 극대화]
+🔥 충격/경고형: 위험 신호 / 늦었습니다 / 돌이킬 수 없다 / 놓치면 끝 / 이미 늦었다 / 절대 안됩니다
+🧠 핵심 키워드형: 뇌가 멈췄다 / 신경계 붕괴 / 발달 정지 / 미주신경 차단 / 행동이 아니다
+⚡ 대비/구분형: 정상 vs 위험 / 기다림 vs 방치 / 행동 vs 신호 / 진짜 vs 가짜
+👶 직접 호소형: 꼭 보세요 / 확인하세요 / 이것만 보세요 / 부모 필수
+🎯 숫자/솔루션형: 딱 3가지 / 5분 해결 / 1가지 원인 / 골든타임
+⚠️ 규칙: 반드시 1~3단어, 굵은 글씨 시각화 기준, 설명하지 말고 키워드로 찍어라. "~입니다/~해요" 같은 종결어미 사용 금지.
 
 [썸네일 이미지 프롬프트 가이드 — Nick Invests 스타일 참고]
 Write 2 thumbnail image generation prompts in ENGLISH for A/B testing.
@@ -288,9 +289,9 @@ Write 2 thumbnail image generation prompts in ENGLISH for A/B testing.
   "final_title": "최종 추천 제목"${isShorts ? '' : `,
   "thumbnail_cot_log": "썸네일 선정 근거 + 어떤 레퍼런스 패턴을 참고했는지 2~3문장",
   "thumbnail_candidates": [
-    { "text": "문구 (2~4단어, 굵은 글씨에 적합한 짧고 임팩트 있는 텍스트)", "score": 90, "reason": "참고한 레퍼런스 번호 + 한줄평" }
+    { "text": "1~3단어 키워드 (문장 금지, 종결어미 금지, Nick Invests처럼 굵은 글씨로 박히는 임팩트 키워드)", "score": 90, "reason": "참고한 레퍼런스 패턴 + 한줄평" }
   ],
-  "final_thumbnail_copy": "최종 추천 썸네일 문구 (2~4단어)",
+  "final_thumbnail_copy": "최종 추천 썸네일 키워드 (1~3단어, 문장 아닌 키워드)",
   "thumbnail_image_prompts": [
     { "variant": "A", "prompt": "YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left (30% of frame), character with [emotion] expression, simple minimal layout, whiteboard animation style, high contrast, [topic-related prop], no text in image", "concept": "Character left + right empty space (text overlay area)" },
     { "variant": "B", "prompt": "YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left with different pose, [different emotion] expression, topic-related simple props, minimal clean layout, whiteboard animation style, no text in image", "concept": "Different pose/emotion character + props" }
