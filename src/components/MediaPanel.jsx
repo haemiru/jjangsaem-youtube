@@ -3,7 +3,7 @@ import { Image as ImageIcon, ArrowRight, Loader2, StopCircle, RotateCw, AlertCir
 import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
 import { VideoGenerator } from '../services/videoGenerator';
 
-const COMMON_SUFFIX = ", for Korean audience, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content, avoid placing important elements in the bottom 15% area";
+const COMMON_SUFFIX = ", for Korean audience, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content, do not place important elements in the bottom 20% of the frame (reserved for subtitles), all text in the image must be in Korean (한글) only, no English text";
 
 const GEMINI_MODEL = 'gemini-3-pro-image-preview';
 const DELAY_BETWEEN_REQUESTS_MS = 3000;
@@ -276,7 +276,7 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
     // Thumbnails — skip for Shorts (Nick Invests style: white bg + cartoon character + bold text)
     if (!isShorts) {
       const thumbBasePrompt = script.thumbnailImagePrompts?.[0]?.prompt
-        || `YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left, expressive emotion, minimal layout, high contrast, whiteboard animation style, no text in image`;
+        || `YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left, expressive emotion, bold Korean keyword text on right side, minimal layout, high contrast, whiteboard animation style, no English text, keep bottom 20% clear`;
       const thumbAltPrompt = script.thumbnailImagePrompts?.[1]?.prompt
         || thumbBasePrompt + ', different pose and angle, different composition';
 
@@ -286,7 +286,7 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
 
     const outroPrompt = script.outro_image_prompt
       ? `${script.outro_image_prompt}${suffix}`
-      : `Warm and clean ending card background, soft gradient, subtle sparkle effects, empty center area for text overlay, suitable for thank you message and channel subscription CTA, no text in image.${suffix}`;
+      : `Warm and clean ending card background, soft gradient, subtle sparkle effects, empty center area for text overlay, suitable for thank you message and channel subscription CTA, Korean text only if needed, no English text.${suffix}`;
     items.push({ id: 'outro', label: '엔딩', prompt: outroPrompt, status: 'idle', url: null });
 
     setQueue(items);
