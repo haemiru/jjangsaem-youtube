@@ -399,10 +399,11 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
     reader.readAsDataURL(file);
   };
 
-  // Download all completed images
-  const downloadAllImages = () => {
+  // Download all completed images (500ms interval to avoid browser throttling)
+  const downloadAllImages = async () => {
     const completed = queue.filter(q => q.status === 'done' && q.url);
-    completed.forEach((item, i) => {
+    for (let i = 0; i < completed.length; i++) {
+      const item = completed[i];
       const link = document.createElement('a');
       link.href = item.url;
       const ext = item.url.startsWith('data:image/png') ? 'png' : item.url.startsWith('data:image/webp') ? 'webp' : 'jpg';
@@ -410,7 +411,10 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    });
+      if (i < completed.length - 1) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
   };
 
   const completedCount = queue.filter(q => q.status === 'done').length;

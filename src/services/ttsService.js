@@ -88,25 +88,14 @@ export async function synthesizeAllSections(script, { stylePrompt, speedRate = D
   const items = [];
 
   const textParts = [];
-  const introText = script.hook
-    ? script.hook + (script.empathy ? ' ' + script.empathy : '') + (script.twist ? ' ' + script.twist : '')
-    : '';
-  if (introText) {
-    textParts.push({ id: 'intro', text: introText });
-  }
+  // 오프닝/엔딩은 TTS 없이 타임라인 duration 사용 (타이틀카드/엔드카드)
+  // 섹션만 1:1로 TTS 생성 — 각 섹션 이미지와 정확히 매칭
   if (script.sections) {
     script.sections.forEach((sec, idx) => {
-      // Skip section if it duplicates the intro (hook + empathy + twist)
-      const secText = (sec.script || '').replace(/\s+/g, '');
-      const introNorm = introText.replace(/\s+/g, '');
-      if (introNorm && (secText === introNorm || introNorm.includes(secText) || secText.includes(introNorm))) {
-        return;
+      if (sec.script) {
+        textParts.push({ id: `section_${idx}`, text: sec.script });
       }
-      textParts.push({ id: `section_${idx}`, text: sec.script });
     });
-  }
-  if (script.cta?.text) {
-    textParts.push({ id: 'outro', text: script.cta.text });
   }
 
   for (let i = 0; i < textParts.length; i++) {

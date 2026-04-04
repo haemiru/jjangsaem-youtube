@@ -235,15 +235,32 @@ export class VideoGenerator {
   }
 
   async prepareAudio() {
-    // Write each TTS section audio
+    // Build audio track aligned with timeline — insert silence for items without TTS (intro/outro)
+    const sectionData = this.buildSectionData();
     const concatList = [];
-    for (const tts of this.ttsAudios) {
-      const filename = `tts_${tts.id}.wav`;
-      await this.ffmpeg.writeFile(filename, base64ToUint8Array(tts.audioBase64));
-      concatList.push(`file '${filename}'`);
+    let silenceIdx = 0;
+
+    for (const section of sectionData) {
+      const tts = this.ttsAudios.find(a => a.id === section.id);
+      if (tts) {
+        const filename = `tts_${tts.id}.wav`;
+        await this.ffmpeg.writeFile(filename, base64ToUint8Array(tts.audioBase64));
+        concatList.push(`file '${filename}'`);
+      } else {
+        // Generate silence for this section's duration (intro/outro etc.)
+        const durationSec = section.frameCount / this.fps;
+        const silenceFile = `silence_${silenceIdx++}.wav`;
+        await this.ffmpeg.exec([
+          '-f', 'lavfi', '-i', `anullsrc=r=24000:cl=mono`,
+          '-t', String(durationSec),
+          '-c:a', 'pcm_s16le',
+          silenceFile
+        ]);
+        concatList.push(`file '${silenceFile}'`);
+      }
     }
 
-    // Concat all TTS into one narration track
+    // Concat all into one narration track
     await this.ffmpeg.writeFile('concat_list.txt', new TextEncoder().encode(concatList.join('\n')));
     await this.ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat_list.txt', '-c:a', 'pcm_s16le', 'narration.wav']);
 
@@ -414,24 +431,9 @@ export class VideoGenerator {
   }
 
   buildSectionData() {
-    // Build ordered TTS queue (excluding thumbnails)
-    const ttsQueue = [...this.ttsAudios];
-    let ttsIdx = 0;
-
+    // 정확한 ID 매칭만 사용 — intro/outro는 TTS 없이 타임라인 duration 사용
     return this.timeline.map(item => {
-      // Try exact ID match first
-      let tts = this.ttsAudios.find(a => a.id === item.id);
-
-      // If no exact match, assign next TTS in sequence (handles ID mismatch from skipped sections)
-      if (!tts && ttsIdx < ttsQueue.length && !item.id.startsWith('thumb_')) {
-        tts = ttsQueue[ttsIdx];
-        ttsIdx++;
-      } else if (tts) {
-        // Advance ttsIdx past this matched item
-        const matchedQueueIdx = ttsQueue.indexOf(tts);
-        if (matchedQueueIdx >= ttsIdx) ttsIdx = matchedQueueIdx + 1;
-      }
-
+      const tts = this.ttsAudios.find(a => a.id === item.id);
       const durationSec = tts ? tts.duration : item.duration;
       return {
         id: item.id,
