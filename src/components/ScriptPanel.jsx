@@ -260,13 +260,27 @@ JSON만 출력.`;
 [핵심 태그] ${(benchmark?.tagPool || []).slice(0, 10).join(', ')}
 [포맷] ${plan.format}
 ${isShorts ? '' : `
-[검증된 고CTR 썸네일 문구 레퍼런스 — Nick Invests 스타일: 1~3단어 키워드형, 문장 금지, 임팩트 극대화]
-🔥 충격/경고형: 위험 신호 / 늦었습니다 / 돌이킬 수 없다 / 놓치면 끝 / 이미 늦었다 / 절대 안됩니다
-🧠 핵심 키워드형: 뇌가 멈췄다 / 신경계 붕괴 / 발달 정지 / 미주신경 차단 / 행동이 아니다
-⚡ 대비/구분형: 정상 vs 위험 / 기다림 vs 방치 / 행동 vs 신호 / 진짜 vs 가짜
-👶 직접 호소형: 꼭 보세요 / 확인하세요 / 이것만 보세요 / 부모 필수
-🎯 숫자/솔루션형: 딱 3가지 / 5분 해결 / 1가지 원인 / 골든타임
-⚠️ 규칙: 반드시 1~3단어, 굵은 글씨 시각화 기준, 설명하지 말고 키워드로 찍어라. "~입니다/~해요" 같은 종결어미 사용 금지.
+[검증된 고CTR 썸네일 문구 레퍼런스 — 짧지만 영상 주제가 바로 전달되는 문구]
+핵심 원칙: 썸네일 문구만 보고도 "이 영상이 무슨 이야기인지" 즉시 파악 가능해야 함.
+제목과 같은 수준의 의미 전달력 + 시각적 임팩트를 동시에 갖출 것.
+
+✅ 좋은 예시 (주제가 바로 보임):
+- 영상 주제 "아이가 몸을 잘 못쓰는 이유" → "몸치, 뇌 문제입니다" / "근력이 아닙니다"
+- 영상 주제 "미주신경과 수면" → "잠 못 자는 진짜 이유" / "미주신경이 꺼졌다"
+- 영상 주제 "자폐 조기 발견" → "자폐 조기 신호 3가지" / "이 행동 보이면 검사하세요"
+
+❌ 나쁜 예시 (맥락 없이 무슨 뜻인지 모름):
+- "뇌가 잘못 배웠다" (뭘?) / "힘이 아니다" (뭐가?) / "신전 패턴 과잉" (무슨 말?)
+
+패턴 유형:
+🔥 경고+주제형: [주제] 위험합니다 / [주제] 놓치면 끝 / [현상]의 진짜 원인
+🧠 반전+주제형: [통념] 아닙니다 / [현상], 뇌 문제입니다 / [행동]이 아니라 [원인]
+⚡ 핵심 전달형: [주제] 꼭 확인하세요 / [대상] 필수 체크 / [숫자]가지 [주제]
+
+⚠️ 규칙:
+- 3~7단어, 문구만 봐도 영상 내용이 전달되어야 함
+- 제목처럼 직관적이고 구체적일 것 (추상적 키워드 나열 금지)
+- 종결어미 사용 가능 (임팩트 있으면 OK)
 
 [썸네일 이미지 프롬프트 가이드 — Nick Invests 스타일 참고]
 Write 2 thumbnail image generation prompts in ENGLISH for A/B testing.
@@ -290,9 +304,9 @@ Write 2 thumbnail image generation prompts in ENGLISH for A/B testing.
   "final_title": "최종 추천 제목"${isShorts ? '' : `,
   "thumbnail_cot_log": "썸네일 선정 근거 + 어떤 레퍼런스 패턴을 참고했는지 2~3문장",
   "thumbnail_candidates": [
-    { "text": "1~3단어 키워드 (문장 금지, 종결어미 금지, Nick Invests처럼 굵은 글씨로 박히는 임팩트 키워드)", "score": 90, "reason": "참고한 레퍼런스 패턴 + 한줄평" }
+    { "text": "3~7단어, 영상 주제가 바로 전달되는 짧고 강렬한 문구 (문구만 봐도 무슨 영상인지 알 수 있어야 함)", "score": 90, "reason": "참고한 레퍼런스 패턴 + 한줄평" }
   ],
-  "final_thumbnail_copy": "최종 추천 썸네일 키워드 (1~3단어, 문장 아닌 키워드)",
+  "final_thumbnail_copy": "최종 추천 썸네일 문구 (3~7단어, 주제 전달력 + 임팩트)",
   "thumbnail_image_prompts": [
     { "variant": "A", "prompt": "YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left (30% of frame), character with [emotion] expression, bold Korean text '[한글 키워드]' displayed prominently on right side, simple minimal layout, whiteboard animation style, high contrast, [topic-related prop], no English text, no text in bottom 20%", "concept": "Character left + bold Korean keyword text right" },
     { "variant": "B", "prompt": "YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left with different pose, [different emotion] expression, bold Korean text '[한글 키워드]' on right side, topic-related simple props, minimal clean layout, whiteboard animation style, no English text, no text in bottom 20%", "concept": "Different pose/emotion + Korean keyword text" }
