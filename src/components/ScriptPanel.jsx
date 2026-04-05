@@ -228,7 +228,8 @@ ${structureGuide}
 3. 각 row의 image_prompt: Write in ENGLISH. A prompt to visualize the sentence as an image.
    - Must include "white background"
    - Character appears with pose/expression explaining the content
-   - Include 1~2 SHORT Korean keyword text (한글 키워드) related to the topic as overlay text in the image. Text must be in Korean (한글), NEVER English.
+   - Include ONLY 1~2 SHORT Korean keyword text (한글 키워드, max 4 words) inside a speech bubble or label near the character. Text must be in Korean (한글), NEVER English.
+   - CRITICAL: Do NOT include any other text, titles, headlines, captions, or sentences in the image. Only the specified Korean keyword should be visible.
    - Focus on character pose, expression, simple props/icons
    - Do NOT place any text in the bottom 20% of the frame (reserved for video subtitles). Characters and props can use the full frame freely.
 4. 각 row의 video_prompt: Write in ENGLISH. A prompt to animate the image into a 5-second video.
@@ -243,7 +244,7 @@ JSON 출력:
     {
       "section": "hook",
       "script": "대본 문장 (한국어)",
-      "image_prompt": "White background, cartoon character standing with surprised expression, small question mark icon floating above head, minimal clean layout, Korean text '위험 신호' displayed prominently in upper area, no English text",
+      "image_prompt": "White background, cartoon character standing with surprised expression, small question mark icon floating above head, minimalist design, Korean text '위험 신호' inside a speech bubble near character's head, no other text or headlines, no English text",
       "video_prompt": "Camera slowly zooms into character, question mark icon bounces, character's eyes widen"
     }
   ],

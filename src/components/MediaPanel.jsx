@@ -3,9 +3,9 @@ import { Image as ImageIcon, ArrowRight, Loader2, StopCircle, RotateCw, AlertCir
 import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
 import { VideoGenerator } from '../services/videoGenerator';
 
-const COMMON_SUFFIX = ", for Korean audience, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content, do not place text in the bottom 20% of the frame (reserved for subtitles) but characters and props can use the full frame, all text in the image must be in Korean (한글) only, no English text";
+const COMMON_SUFFIX = ", for Korean audience, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content, do not place text in the bottom 20% of the frame (reserved for subtitles) but characters and props can use the full frame, all text in the image must be in Korean (한글) only, no English text, no headlines, no background sentences, minimalist design";
 
-const GEMINI_MODEL = 'gemini-3-pro-image-preview';
+const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
 const DELAY_BETWEEN_REQUESTS_MS = 3000;
 
 async function generateImageWithGemini(prompt, referenceImage = null, retries = 3) {
@@ -264,12 +264,11 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
     imageSources.forEach((sec, idx) => {
       if (!sec.image_prompt) return;
       const sectionLabel = sec.section ? `${sec.section}` : `섹션${idx+1}`;
-      const keyword = sec.keyword || sec.script || '';
-      // 키워드가 길면 앞부분만 사용 (최대 20자)
+      const keyword = sec.keyword || '';
       const shortKeyword = keyword.length > 20 ? keyword.substring(0, 20).replace(/[,.]$/, '') : keyword;
       const keywordInstruction = shortKeyword
-        ? `. IMPORTANT: Include the following Korean text (한글) as overlay text in the upper area of the image: "${shortKeyword}". The text MUST be written in Korean (한글), NOT in English or any other language. Display the Korean text prominently and clearly readable.`
-        : '';
+        ? `. Only text allowed: Korean text '${shortKeyword}' inside a speech bubble or label near the main character. Do not include any other text, titles, headlines, or captions. Only the specified text '${shortKeyword}' should be visible.`
+        : '. Do not include any text, titles, headlines, or captions in the image.';
       items.push({ id: `section_${idx}`, label: sectionLabel, prompt: `${sec.image_prompt}${keywordInstruction}${suffix}`, status: 'idle', url: null });
     });
 
