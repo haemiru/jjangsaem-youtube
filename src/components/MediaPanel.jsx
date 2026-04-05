@@ -560,19 +560,40 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
       ctx.fillStyle = `rgba(0, 0, 0, ${thumbSettings.dim / 100})`;
       ctx.fillRect(0, 0, 1280, 720);
 
-      // Text overlay
-      ctx.font = `bold ${thumbSettings.size * (1280 / 600)}px 'Noto Sans KR', sans-serif`;
+      // Text overlay — positioned on right side (character is on left ~30%)
+      const fontSize = thumbSettings.size * (1280 / 600);
+      ctx.font = `bold ${fontSize}px 'Noto Sans KR', sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillStyle = thumbSettings.color;
-      // Adaptive shadow: light shadow for dark text, dark shadow for light text
       const isDarkText = thumbSettings.color === '#000000' || thumbSettings.color === '#000';
       ctx.shadowColor = isDarkText ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.8)';
       ctx.shadowBlur = isDarkText ? 0 : 8;
 
+      const textX = 830; // Right side center (character occupies left ~30%)
       const textY = thumbSettings.position === 'top' ? 150
         : thumbSettings.position === 'middle' ? 360 : 570;
 
-      ctx.fillText(thumbSettings.text, 640, textY, 1100);
+      // Word-wrap text in right area
+      const maxWidth = 750;
+      const words = thumbSettings.text.split('');
+      let lines = [];
+      let currentLine = '';
+      for (const char of words) {
+        const testLine = currentLine + char;
+        if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = char;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      if (currentLine) lines.push(currentLine);
+
+      const lineHeight = fontSize * 1.3;
+      const startY = textY - ((lines.length - 1) * lineHeight) / 2;
+      for (let li = 0; li < lines.length; li++) {
+        ctx.fillText(lines[li], textX, startY + li * lineHeight, maxWidth);
+      }
       ctx.shadowBlur = 0;
 
       canvas.toBlob(blob => {
@@ -854,9 +875,9 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
                     {/* Dimmer */}
                     <div style={{ position: 'absolute', inset: 0, backgroundColor: 'black', opacity: thumbSettings.dim / 100 }} />
 
-                    {/* Text Overlay */}
+                    {/* Text Overlay — right side (character is on left ~30%) */}
                     <div style={{
-                      position: 'absolute', inset: 0, display: 'flex', padding: '2rem',
+                      position: 'absolute', top: 0, right: 0, bottom: 0, width: '65%', display: 'flex', padding: '1.5rem',
                       alignItems: thumbSettings.position === 'top' ? 'flex-start' : thumbSettings.position === 'middle' ? 'center' : 'flex-end',
                       justifyContent: 'center'
                     }}>
