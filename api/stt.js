@@ -1,4 +1,10 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, FileState } from '@google/generative-ai';
+import { GoogleAIFileManager } from '@google/generative-ai/server';
+
+export const config = {
+  maxDuration: 120,
+  api: { bodyParser: { sizeLimit: '50mb' } },
+};
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,8 +18,38 @@ export default async function handler(req, res) {
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const apiKey = process.env.GEMINI_API_KEY;
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const fileManager = new GoogleAIFileManager(apiKey);
+
+    // Write audio to temp file for File API upload
+    const audioBuffer = Buffer.from(audioBase64, 'base64');
+    const fs = await import('fs');
+    const os = await import('os');
+    const path = await import('path');
+    const tmpFile = path.join(os.tmpdir(), `stt_audio_${Date.now()}.wav`);
+    fs.writeFileSync(tmpFile, audioBuffer);
+
+    // Upload via File API (no size limit issues)
+    const uploadResult = await fileManager.uploadFile(tmpFile, {
+      mimeType: mimeType || 'audio/wav',
+      displayName: 'narration_audio',
+    });
+
+    // Clean up temp file
+    try { fs.unlinkSync(tmpFile); } catch {}
+
+    // Wait for file processing
+    let file = uploadResult.file;
+    while (file.state === FileState.PROCESSING) {
+      await new Promise(r => setTimeout(r, 2000));
+      const getResult = await fileManager.getFile(file.name);
+      file = getResult;
+    }
+
+    if (file.state === FileState.FAILED) {
+      throw new Error('Audio file processing failed');
+    }
 
     // Build section list for alignment prompt
     const sectionList = sections.map((s, i) => `${i + 1}. "${s}"`).join('\n');
@@ -28,12 +64,14 @@ ${sectionList}
 
 [{"section":1,"startTime":0.0,"endTime":5.2},{"section":2,"startTime":5.2,"endTime":10.8}]`;
 
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
     const result = await model.generateContent({
       contents: [{
         role: 'user',
         parts: [
           { text: prompt },
-          { inlineData: { mimeType: mimeType || 'audio/wav', data: audioBase64 } }
+          { fileData: { mimeType: file.mimeType, fileUri: file.uri } }
         ]
       }],
       generationConfig: {
@@ -48,10 +86,14 @@ ${sectionList}
     // Extract JSON from response
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      throw new Error('Failed to parse STT alignment response');
+      throw new Error('Failed to parse STT alignment response: ' + responseText.substring(0, 200));
     }
 
     const segments = JSON.parse(jsonMatch[0]);
+
+    // Clean up uploaded file
+    try { await fileManager.deleteFile(file.name); } catch {}
+
     res.status(200).json({ segments });
 
   } catch (e) {
