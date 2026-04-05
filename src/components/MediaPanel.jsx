@@ -280,11 +280,15 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
 
     // Thumbnails — skip for Shorts (Nick Invests style: white bg + cartoon character + bold text)
     if (!isShorts) {
-      const thumbNoText = '. Do not include any text, titles, headlines, captions, or Korean text in the image. The image must contain only the character and props, no text at all. Text will be added separately in post-production.';
-      const thumbBasePrompt = script.thumbnailImagePrompts?.[0]?.prompt
+      const thumbNoText = '. CRITICAL: Do not include any text, titles, headlines, captions, or Korean text in the image. The image must contain only the character and props, absolutely no text at all. Leave the right side empty for post-production text overlay.';
+      let thumbBasePrompt = script.thumbnailImagePrompts?.[0]?.prompt
         || `YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left (30% of frame), expressive emotion, right side empty space for text overlay, minimal layout, high contrast, whiteboard animation style`;
-      const thumbAltPrompt = script.thumbnailImagePrompts?.[1]?.prompt
+      let thumbAltPrompt = script.thumbnailImagePrompts?.[1]?.prompt
         || thumbBasePrompt + ', different pose and angle, different composition';
+
+      // Strip any existing text instructions from saved prompts
+      thumbBasePrompt = thumbBasePrompt.replace(/,?\s*(bold |Korean |한글|text |'[^']*'|"[^"]*")*(keyword|text|글자|키워드)[^,]*/gi, '');
+      thumbAltPrompt = thumbAltPrompt.replace(/,?\s*(bold |Korean |한글|text |'[^']*'|"[^"]*")*(keyword|text|글자|키워드)[^,]*/gi, '');
 
       items.push({ id: 'thumb_a', label: '썸네일 A', prompt: `${thumbBasePrompt}${thumbNoText}${suffix}`, status: 'idle', url: null });
       items.push({ id: 'thumb_b', label: '썸네일 B', prompt: `${thumbAltPrompt}${thumbNoText}${suffix}`, status: 'idle', url: null });
