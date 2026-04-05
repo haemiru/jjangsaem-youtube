@@ -71,7 +71,7 @@ export async function synthesizeSpeech(text, { stylePrompt, speedRate = DEFAULT_
 
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`TTS API 오류 (${res.status}): ${err.substring(0, 200)}`);
+      throw new Error(`TTS API 오류 (${res.status}): ${err.substring(0, 500)}`);
     }
 
     const data = await res.json();
