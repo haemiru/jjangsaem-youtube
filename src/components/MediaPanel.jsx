@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Image as ImageIcon, ArrowRight, Loader2, StopCircle, RotateCw, AlertCircle, Play, Upload, Edit3, ChevronUp, Download, X, ZoomIn, ArrowUp, ArrowDown, Film, Save, Settings2, Type } from 'lucide-react';
-import { synthesizeFullScript, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
-import { alignAudioToSections, buildTimingsFromAlignment, getAudioDurationFromFile } from '../services/sttService';
+import { synthesizeChunkedScript, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
+import { buildTimingsFromAlignment, getAudioDurationFromFile } from '../services/sttService';
 import { VideoGenerator } from '../services/videoGenerator';
 
 const COMMON_SUFFIX = ", for Korean audience, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content, do not place text in the bottom 20% of the frame (reserved for subtitles) but characters and props can use the full frame, all text in the image must be in Korean (한글) only, no English text, no headlines, no background sentences, minimalist design";
@@ -463,31 +463,27 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
       let ttsAudios;
       let uploadedAudio = null;
 
-      // Determine audio source file (either uploaded or AI-generated)
-      let audioFile;
       if (audioMode === 'upload' && uploadedAudioFile) {
-        audioFile = uploadedAudioFile;
+        // --- Upload mode: use uploaded audio + proportional timing ---
+        setVideoProgress({ step: 'stt', label: '섹션별 타이밍 계산 중...' });
+        const scriptSections = script.sections?.length > 0 ? script.sections : (script.rows || []);
+        const totalDuration = await getAudioDurationFromFile(uploadedAudioFile);
+        ttsAudios = buildTimingsFromAlignment(null, scriptSections, totalDuration);
+        uploadedAudio = uploadedAudioFile;
       } else {
-        // --- TTS mode: generate full script audio in one API call ---
+        // --- TTS mode: generate in 3 chunks (grouped by section type) ---
         const selectedStyle = STYLE_PROMPTS[ttsTone]?.find(s => s.id === ttsStyleId);
-        audioFile = await synthesizeFullScript(script, {
+        const result = await synthesizeChunkedScript(script, {
           stylePrompt: selectedStyle?.prompt || STYLE_PROMPTS['따뜻한'][0].prompt,
           speedRate: ttsSpeed,
           voiceName: ttsVoice,
           onProgress: setVideoProgress,
         });
+        ttsAudios = result.ttsAudios;
+        uploadedAudio = result.audioFile;
       }
 
-      // --- Analyze audio and align to sections ---
-      setVideoProgress({ step: 'stt', label: '음성 분석 중 (섹션별 타이밍 매칭)...' });
-      const scriptSections = script.sections?.length > 0 ? script.sections : (script.rows || []);
-      const totalDuration = await getAudioDurationFromFile(audioFile);
-
-      const segments = await alignAudioToSections(audioFile, scriptSections, setVideoProgress);
-      ttsAudios = buildTimingsFromAlignment(segments, scriptSections, totalDuration);
-      uploadedAudio = audioFile;
-
-      setVideoProgress({ step: 'stt', label: `음성 분석 완료 (${ttsAudios.length}개 섹션 매칭)` });
+      setVideoProgress({ step: 'tts', label: `음성 준비 완료 (${ttsAudios.length}개 섹션)` });
 
       if (videoGenRef.current?.aborted) return;
 

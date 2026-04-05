@@ -93,31 +93,135 @@ export async function getAudioDuration(base64Audio) {
   }
 }
 
+// Section grouping for chunked TTS (3 chunks for voice consistency + manageable size)
+const CHUNK_GROUPS = [
+  ['hook', 'empathy', 'twist'],  // 도입부
+  ['core', 'explain'],            // 핵심 내용
+  ['solution', 'cta'],            // 해결 + 마무리
+];
+
+function groupSectionsIntoChunks(sections) {
+  const chunks = CHUNK_GROUPS.map((groupSections, idx) => ({
+    id: idx,
+    label: ['도입부', '핵심 내용', '마무리'][idx],
+    sections: [],
+    sectionIndices: [],
+  }));
+
+  sections.forEach((sec, idx) => {
+    const sectionType = (sec.section || '').toLowerCase();
+    const chunkIdx = CHUNK_GROUPS.findIndex(group =>
+      group.some(g => sectionType.includes(g))
+    );
+    // Default to last chunk if section type not recognized
+    const targetChunk = chunkIdx >= 0 ? chunkIdx : chunks.length - 1;
+    chunks[targetChunk].sections.push(sec);
+    chunks[targetChunk].sectionIndices.push(idx);
+  });
+
+  return chunks.filter(c => c.sections.length > 0);
+}
+
 /**
- * Generate TTS for the full script in a single API call.
- * Returns a WAV audio File object (like user-uploaded narration).
+ * Generate TTS in 3 chunked API calls (grouped by section type).
+ * Returns { audioFile, ttsAudios } where audioFile is the combined WAV
+ * and ttsAudios has per-section durations.
  */
-export async function synthesizeFullScript(script, { stylePrompt, speedRate = DEFAULT_SPEED_RATE, voiceName = 'Kore', onProgress } = {}) {
+export async function synthesizeChunkedScript(script, { stylePrompt, speedRate = DEFAULT_SPEED_RATE, voiceName = 'Kore', onProgress } = {}) {
   const ttsSource = script.sections?.length > 0 ? script.sections : (script.rows || []);
-  const fullText = ttsSource
-    .map(sec => sec.script || '')
-    .filter(t => t.length > 0)
-    .join('\n\n');
+  if (ttsSource.length === 0) throw new Error('대본 텍스트가 없습니다.');
 
-  if (!fullText) throw new Error('대본 텍스트가 없습니다.');
+  const chunks = groupSectionsIntoChunks(ttsSource);
+  const allAudioParts = []; // { base64, duration, sectionIndices, sections }
 
-  onProgress?.({ step: 'tts', label: '전체 음성 생성 중... (1회 요청)' });
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const chunkText = chunk.sections
+      .map(sec => sec.script || '')
+      .filter(t => t.length > 0)
+      .join('\n\n');
 
-  const audioBase64 = await synthesizeSpeech(fullText, { stylePrompt, speedRate, voiceName });
+    if (!chunkText) continue;
 
-  // Convert base64 WAV to File object (for unified handling with upload mode)
-  onProgress?.({ step: 'tts', label: '음성 파일 변환 중...' });
-  const binary = atob(audioBase64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    onProgress?.({ step: 'tts', label: `음성 생성 중... (${i + 1}/${chunks.length} - ${chunk.label})` });
 
-  const blob = new Blob([bytes], { type: 'audio/wav' });
-  const file = new File([blob], 'tts_narration.wav', { type: 'audio/wav' });
+    const audioBase64 = await synthesizeSpeech(chunkText, { stylePrompt, speedRate, voiceName });
+    const duration = await getAudioDuration(audioBase64);
 
-  return file;
+    allAudioParts.push({
+      base64: audioBase64,
+      duration,
+      sectionIndices: chunk.sectionIndices,
+      sections: chunk.sections,
+    });
+
+    // Delay between chunks to avoid rate limiting
+    if (i < chunks.length - 1) {
+      await new Promise(r => setTimeout(r, DELAY_BETWEEN_CALLS));
+    }
+  }
+
+  // Build per-section ttsAudios with proportional timing within each chunk
+  onProgress?.({ step: 'tts', label: '섹션별 타이밍 계산 중...' });
+  const ttsAudios = new Array(ttsSource.length);
+
+  for (const part of allAudioParts) {
+    // Proportional split within this chunk
+    const sectionWeights = part.sections.map(s => {
+      const text = s.script || '';
+      const punctCount = (text.match(/[.!?。，,\n]/g) || []).length;
+      return text.length + punctCount * 3;
+    });
+    const totalWeight = sectionWeights.reduce((sum, w) => sum + w, 0);
+
+    part.sectionIndices.forEach((globalIdx, localIdx) => {
+      const ratio = totalWeight > 0 ? sectionWeights[localIdx] / totalWeight : 1 / part.sections.length;
+      ttsAudios[globalIdx] = {
+        id: `section_${globalIdx}`,
+        audioBase64: null,
+        duration: Math.max(0.5, part.duration * ratio),
+        text: part.sections[localIdx]?.script || '',
+      };
+    });
+  }
+
+  // Combine all audio parts into a single WAV file
+  onProgress?.({ step: 'tts', label: '음성 파일 합치는 중...' });
+  const audioBuffers = allAudioParts.map(p => {
+    const binary = atob(p.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  });
+
+  // Simple WAV concatenation: skip headers (44 bytes) for subsequent files
+  const firstHeader = audioBuffers[0].slice(0, 44);
+  const allPcmData = audioBuffers.map((buf, i) => i === 0 ? buf.slice(44) : buf.slice(44));
+  const totalPcmLength = allPcmData.reduce((sum, buf) => sum + buf.length, 0);
+
+  // Update header with new data size
+  const combined = new Uint8Array(44 + totalPcmLength);
+  combined.set(firstHeader, 0);
+  // Update RIFF chunk size
+  const riffSize = 36 + totalPcmLength;
+  combined[4] = riffSize & 0xff;
+  combined[5] = (riffSize >> 8) & 0xff;
+  combined[6] = (riffSize >> 16) & 0xff;
+  combined[7] = (riffSize >> 24) & 0xff;
+  // Update data chunk size
+  combined[40] = totalPcmLength & 0xff;
+  combined[41] = (totalPcmLength >> 8) & 0xff;
+  combined[42] = (totalPcmLength >> 16) & 0xff;
+  combined[43] = (totalPcmLength >> 24) & 0xff;
+
+  let offset = 44;
+  for (const pcm of allPcmData) {
+    combined.set(pcm, offset);
+    offset += pcm.length;
+  }
+
+  const blob = new Blob([combined], { type: 'audio/wav' });
+  const audioFile = new File([blob], 'tts_narration.wav', { type: 'audio/wav' });
+
+  return { audioFile, ttsAudios: ttsAudios.filter(Boolean) };
 }
