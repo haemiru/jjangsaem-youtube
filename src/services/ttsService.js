@@ -45,29 +45,38 @@ export const SPEED_OPTIONS = [
   { id: 2.0, label: '2배속' },
 ];
 
-const DELAY_BETWEEN_CALLS = 800;
+const DELAY_BETWEEN_CALLS = 2000;
 
 export const DEFAULT_SPEED_RATE = 1.5;
 
 export async function synthesizeSpeech(text, { stylePrompt, speedRate = DEFAULT_SPEED_RATE, voiceName = 'Kore' } = {}) {
-  const res = await fetch('/api/tts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text,
-      voiceName,
-      stylePrompt,
-      speedRate
-    })
-  });
+  const maxRetries = 3;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        voiceName,
+        stylePrompt,
+        speedRate
+      })
+    });
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`TTS API 오류 (${res.status}): ${err.substring(0, 200)}`);
+    if (res.status === 429 && attempt < maxRetries - 1) {
+      const backoff = Math.pow(2, attempt + 1) * 3000; // 6s, 12s
+      await new Promise(r => setTimeout(r, backoff));
+      continue;
+    }
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`TTS API 오류 (${res.status}): ${err.substring(0, 200)}`);
+    }
+
+    const data = await res.json();
+    return data.audioContent; // base64 WAV
   }
-
-  const data = await res.json();
-  return data.audioContent; // base64 WAV
 }
 
 export async function getAudioDuration(base64Audio) {
