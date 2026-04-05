@@ -177,6 +177,7 @@ export class VideoGenerator {
   constructor(options) {
     this.timeline = options.timeline;       // [{id, label, url, duration}]
     this.ttsAudios = options.ttsAudios;     // [{id, audioBase64, duration, text}]
+    this.uploadedAudio = options.uploadedAudio; // File object or null (user-uploaded narration)
     this.bgmUrl = options.bgmUrl;           // URL to BGM mp3 or null
     this.showSubtitle = options.showSubtitle;
     this.isShorts = options.isShorts;
@@ -235,34 +236,68 @@ export class VideoGenerator {
   }
 
   async prepareAudio() {
-    // Build audio track aligned with timeline — insert silence for items without TTS (intro/outro)
-    const sectionData = this.buildSectionData();
-    const concatList = [];
-    let silenceIdx = 0;
+    if (this.uploadedAudio) {
+      // --- Uploaded narration mode ---
+      const audioData = new Uint8Array(await this.uploadedAudio.arrayBuffer());
+      const ext = this.uploadedAudio.name.split('.').pop() || 'mp3';
+      await this.ffmpeg.writeFile(`uploaded_audio.${ext}`, audioData);
 
-    for (const section of sectionData) {
-      const tts = this.ttsAudios.find(a => a.id === section.id);
-      if (tts) {
-        const filename = `tts_${tts.id}.wav`;
-        await this.ffmpeg.writeFile(filename, base64ToUint8Array(tts.audioBase64));
-        concatList.push(`file '${filename}'`);
-      } else {
-        // Generate silence for this section's duration (intro/outro etc.)
-        const durationSec = section.frameCount / this.fps;
+      // Generate silence for intro
+      const sectionData = this.buildSectionData();
+      const introItem = sectionData.find(s => s.id === 'intro');
+      const outroItem = sectionData.find(s => s.id === 'outro');
+      const concatList = [];
+      let silenceIdx = 0;
+
+      if (introItem) {
+        const introDur = introItem.frameCount / this.fps;
         const silenceFile = `silence_${silenceIdx++}.wav`;
-        await this.ffmpeg.exec([
-          '-f', 'lavfi', '-i', `anullsrc=r=24000:cl=mono`,
-          '-t', String(durationSec),
-          '-c:a', 'pcm_s16le',
-          silenceFile
-        ]);
+        await this.ffmpeg.exec(['-f', 'lavfi', '-i', 'anullsrc=r=24000:cl=mono', '-t', String(introDur), '-c:a', 'pcm_s16le', silenceFile]);
         concatList.push(`file '${silenceFile}'`);
       }
-    }
 
-    // Concat all into one narration track
-    await this.ffmpeg.writeFile('concat_list.txt', new TextEncoder().encode(concatList.join('\n')));
-    await this.ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat_list.txt', '-c:a', 'pcm_s16le', 'narration.wav']);
+      // Convert uploaded audio to WAV
+      await this.ffmpeg.exec(['-i', `uploaded_audio.${ext}`, '-ar', '24000', '-ac', '1', '-c:a', 'pcm_s16le', 'uploaded_converted.wav']);
+      concatList.push(`file 'uploaded_converted.wav'`);
+
+      if (outroItem) {
+        const outroDur = outroItem.frameCount / this.fps;
+        const silenceFile = `silence_${silenceIdx++}.wav`;
+        await this.ffmpeg.exec(['-f', 'lavfi', '-i', 'anullsrc=r=24000:cl=mono', '-t', String(outroDur), '-c:a', 'pcm_s16le', silenceFile]);
+        concatList.push(`file '${silenceFile}'`);
+      }
+
+      await this.ffmpeg.writeFile('concat_list.txt', new TextEncoder().encode(concatList.join('\n')));
+      await this.ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat_list.txt', '-c:a', 'pcm_s16le', 'narration.wav']);
+
+    } else {
+      // --- TTS mode (existing logic) ---
+      const sectionData = this.buildSectionData();
+      const concatList = [];
+      let silenceIdx = 0;
+
+      for (const section of sectionData) {
+        const tts = this.ttsAudios.find(a => a.id === section.id);
+        if (tts && tts.audioBase64) {
+          const filename = `tts_${tts.id}.wav`;
+          await this.ffmpeg.writeFile(filename, base64ToUint8Array(tts.audioBase64));
+          concatList.push(`file '${filename}'`);
+        } else {
+          const durationSec = section.frameCount / this.fps;
+          const silenceFile = `silence_${silenceIdx++}.wav`;
+          await this.ffmpeg.exec([
+            '-f', 'lavfi', '-i', `anullsrc=r=24000:cl=mono`,
+            '-t', String(durationSec),
+            '-c:a', 'pcm_s16le',
+            silenceFile
+          ]);
+          concatList.push(`file '${silenceFile}'`);
+        }
+      }
+
+      await this.ffmpeg.writeFile('concat_list.txt', new TextEncoder().encode(concatList.join('\n')));
+      await this.ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat_list.txt', '-c:a', 'pcm_s16le', 'narration.wav']);
+    }
 
     // Write BGM if provided
     if (this.bgmUrl) {

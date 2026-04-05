@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Image as ImageIcon, ArrowRight, Loader2, StopCircle, RotateCw, AlertCircle, Play, Upload, Edit3, ChevronUp, Download, X, ZoomIn, ArrowUp, ArrowDown, Film, Save, Settings2, Type } from 'lucide-react';
 import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
+import { alignAudioToSections, buildTimingsFromAlignment, getAudioDurationFromFile } from '../services/sttService';
 import { VideoGenerator } from '../services/videoGenerator';
 
 const COMMON_SUFFIX = ", for Korean audience, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content, do not place text in the bottom 20% of the frame (reserved for subtitles) but characters and props can use the full frame, all text in the image must be in Korean (한글) only, no English text, no headlines, no background sentences, minimalist design";
@@ -237,6 +238,11 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
   // TTS resume (keep completed audios across retries)
   const [cachedTtsAudios, setCachedTtsAudios] = useState([]);
 
+  // Audio mode: 'tts' (AI generate) or 'upload' (user uploads narration file)
+  const [audioMode, setAudioMode] = useState('tts');
+  const [uploadedAudioFile, setUploadedAudioFile] = useState(null);
+  const [uploadedAudioUrl, setUploadedAudioUrl] = useState(null);
+
   // Prompt editing for image cards
   const [editingPromptId, setEditingPromptId] = useState(null);
 
@@ -449,22 +455,38 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
     if (videoUrl) { URL.revokeObjectURL(videoUrl); setVideoUrl(null); }
 
     try {
-      // 1. TTS — resume from cached audios if available
       let ttsAudios;
-      const selectedStyle = STYLE_PROMPTS[ttsTone]?.find(s => s.id === ttsStyleId);
-      const ttsOpts = {
-        stylePrompt: selectedStyle?.prompt || STYLE_PROMPTS['따뜻한'][0].prompt,
-        speedRate: ttsSpeed,
-        voiceName: ttsVoice,
-        onProgress: setVideoProgress,
-      };
-      if (cachedTtsAudios.length > 0) {
-        setVideoProgress({ step: 'tts', label: `이전 음성 ${cachedTtsAudios.length}개 재사용, 나머지 생성 중...` });
-        ttsAudios = await synthesizeAllSections(script, { ...ttsOpts, cachedAudios: cachedTtsAudios });
+      let uploadedAudio = null;
+
+      if (audioMode === 'upload' && uploadedAudioFile) {
+        // --- Upload mode: analyze uploaded audio ---
+        setVideoProgress({ step: 'stt', label: '업로드된 음성 분석 중...' });
+        const scriptSections = script.sections?.length > 0 ? script.sections : (script.rows || []);
+        const totalDuration = await getAudioDurationFromFile(uploadedAudioFile);
+
+        const segments = await alignAudioToSections(uploadedAudioFile, scriptSections, setVideoProgress);
+        ttsAudios = buildTimingsFromAlignment(segments, scriptSections, totalDuration);
+        uploadedAudio = uploadedAudioFile;
+
+        setVideoProgress({ step: 'stt', label: `음성 분석 완료 (${ttsAudios.length}개 섹션 매칭)` });
       } else {
-        ttsAudios = await synthesizeAllSections(script, ttsOpts);
+        // --- TTS mode: generate per-section audio ---
+        setVideoProgress({ step: 'tts', label: '음성 합성 준비 중...' });
+        const selectedStyle = STYLE_PROMPTS[ttsTone]?.find(s => s.id === ttsStyleId);
+        const ttsOpts = {
+          stylePrompt: selectedStyle?.prompt || STYLE_PROMPTS['따뜻한'][0].prompt,
+          speedRate: ttsSpeed,
+          voiceName: ttsVoice,
+          onProgress: setVideoProgress,
+        };
+        if (cachedTtsAudios.length > 0) {
+          setVideoProgress({ step: 'tts', label: `이전 음성 ${cachedTtsAudios.length}개 재사용, 나머지 생성 중...` });
+          ttsAudios = await synthesizeAllSections(script, { ...ttsOpts, cachedAudios: cachedTtsAudios });
+        } else {
+          ttsAudios = await synthesizeAllSections(script, ttsOpts);
+        }
+        setCachedTtsAudios(ttsAudios);
       }
-      setCachedTtsAudios(ttsAudios);
 
       if (videoGenRef.current?.aborted) return;
 
@@ -473,6 +495,7 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
       const generator = new VideoGenerator({
         timeline,
         ttsAudios,
+        uploadedAudio,
         bgmUrl: bgmPath,
         showSubtitle,
         isShorts,
@@ -982,41 +1005,94 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
 
               {!videoProgress && !videoUrl && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Audio Mode Toggle */}
                   <div>
-                    <label className="form-label" style={{ fontSize: '0.875rem' }}>음성 선택</label>
-                    <select className="form-control" value={ttsVoice} onChange={e => setTtsVoice(e.target.value)}>
-                      {VOICE_OPTIONS.map(v => (
-                        <option key={v.id} value={v.id}>{v.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.875rem' }}>톤앤매너</label>
-                    <div className="radio-group" style={{ gap: '0.5rem', marginBottom: '0.5rem' }}>
-                      {TONE_OPTIONS.map(tone => (
-                        <label key={tone} className={`radio-label ${ttsTone === tone ? 'selected' : ''}`} style={{ flex: 1, justifyContent: 'center' }}>
-                          <input type="radio" className="radio-input" checked={ttsTone === tone} onChange={() => { setTtsTone(tone); setTtsStyleId(STYLE_PROMPTS[tone][0].id); }} />
-                          {tone}
-                        </label>
-                      ))}
-                    </div>
-                    <select className="form-control" value={ttsStyleId} onChange={e => setTtsStyleId(e.target.value)} style={{ fontSize: '0.85rem' }}>
-                      {STYLE_PROMPTS[ttsTone]?.map(s => (
-                        <option key={s.id} value={s.id}>{s.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.875rem' }}>읽기 속도</label>
+                    <label className="form-label" style={{ fontSize: '0.875rem' }}>음성 방식</label>
                     <div className="radio-group" style={{ gap: '0.5rem' }}>
-                      {SPEED_OPTIONS.map(s => (
-                        <label key={s.id} className={`radio-label ${ttsSpeed === s.id ? 'selected' : ''}`} style={{ flex: 1, justifyContent: 'center', fontSize: '0.8rem' }}>
-                          <input type="radio" className="radio-input" checked={ttsSpeed === s.id} onChange={() => setTtsSpeed(s.id)} />
-                          {s.label}
-                        </label>
-                      ))}
+                      <label className={`radio-label ${audioMode === 'tts' ? 'selected' : ''}`} style={{ flex: 1, justifyContent: 'center' }}>
+                        <input type="radio" className="radio-input" checked={audioMode === 'tts'} onChange={() => setAudioMode('tts')} />
+                        AI 음성 생성
+                      </label>
+                      <label className={`radio-label ${audioMode === 'upload' ? 'selected' : ''}`} style={{ flex: 1, justifyContent: 'center' }}>
+                        <input type="radio" className="radio-input" checked={audioMode === 'upload'} onChange={() => setAudioMode('upload')} />
+                        나레이션 파일 업로드
+                      </label>
                     </div>
                   </div>
+
+                  {audioMode === 'tts' ? (
+                    <>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.875rem' }}>음성 선택</label>
+                        <select className="form-control" value={ttsVoice} onChange={e => setTtsVoice(e.target.value)}>
+                          {VOICE_OPTIONS.map(v => (
+                            <option key={v.id} value={v.id}>{v.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.875rem' }}>톤앤매너</label>
+                        <div className="radio-group" style={{ gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          {TONE_OPTIONS.map(tone => (
+                            <label key={tone} className={`radio-label ${ttsTone === tone ? 'selected' : ''}`} style={{ flex: 1, justifyContent: 'center' }}>
+                              <input type="radio" className="radio-input" checked={ttsTone === tone} onChange={() => { setTtsTone(tone); setTtsStyleId(STYLE_PROMPTS[tone][0].id); }} />
+                              {tone}
+                            </label>
+                          ))}
+                        </div>
+                        <select className="form-control" value={ttsStyleId} onChange={e => setTtsStyleId(e.target.value)} style={{ fontSize: '0.85rem' }}>
+                          {STYLE_PROMPTS[ttsTone]?.map(s => (
+                            <option key={s.id} value={s.id}>{s.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.875rem' }}>읽기 속도</label>
+                        <div className="radio-group" style={{ gap: '0.5rem' }}>
+                          {SPEED_OPTIONS.map(s => (
+                            <label key={s.id} className={`radio-label ${ttsSpeed === s.id ? 'selected' : ''}`} style={{ flex: 1, justifyContent: 'center', fontSize: '0.8rem' }}>
+                              <input type="radio" className="radio-input" checked={ttsSpeed === s.id} onChange={() => setTtsSpeed(s.id)} />
+                              {s.label}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.875rem' }}>나레이션 파일</label>
+                      {!uploadedAudioFile ? (
+                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '1.5rem', border: '2px dashed var(--border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                          <Upload size={18} />
+                          클릭하여 음성 파일 선택 (mp3, wav, m4a)
+                          <input type="file" accept="audio/*" style={{ display: 'none' }} onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setUploadedAudioFile(file);
+                              setUploadedAudioUrl(URL.createObjectURL(file));
+                            }
+                          }} />
+                        </label>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', backgroundColor: 'var(--gray-100)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem' }}>
+                            <Play size={16} />
+                            <span style={{ flex: 1 }}>{uploadedAudioFile.name} ({(uploadedAudioFile.size / 1024 / 1024).toFixed(1)}MB)</span>
+                            <button onClick={() => { setUploadedAudioFile(null); if (uploadedAudioUrl) URL.revokeObjectURL(uploadedAudioUrl); setUploadedAudioUrl(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>
+                              <X size={16} color="#dc2626" />
+                            </button>
+                          </div>
+                          {uploadedAudioUrl && (
+                            <audio src={uploadedAudioUrl} controls style={{ width: '100%', height: '36px' }} />
+                          )}
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            AI가 음성을 분석하여 각 이미지의 타이밍을 자동으로 맞춥니다.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div>
                     <label className="form-label" style={{ fontSize: '0.875rem' }}>화질 선택</label>
                     <div className="radio-group" style={{ gap: '0.5rem' }}>
@@ -1030,7 +1106,7 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
                       </label>
                     </div>
                   </div>
-                  <button className="btn-primary" onClick={startVideoGeneration} style={{ width: '100%' }}>
+                  <button className="btn-primary" onClick={startVideoGeneration} style={{ width: '100%' }} disabled={audioMode === 'upload' && !uploadedAudioFile}>
                     <Film size={18} /> 영상 생성하기
                   </button>
                   {videoError && (
