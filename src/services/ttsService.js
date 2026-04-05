@@ -90,13 +90,12 @@ export async function synthesizeAllSections(script, { stylePrompt, speedRate = D
   const textParts = [];
   // 오프닝/엔딩은 TTS 없이 타임라인 duration 사용 (타이틀카드/엔드카드)
   // 섹션만 1:1로 TTS 생성 — 각 섹션 이미지와 정확히 매칭
-  if (script.sections) {
-    script.sections.forEach((sec, idx) => {
-      if (sec.script) {
-        textParts.push({ id: `section_${idx}`, text: sec.script });
-      }
-    });
-  }
+  const ttsSource = script.sections?.length > 0 ? script.sections : (script.rows || []);
+  ttsSource.forEach((sec, idx) => {
+    if (sec.script) {
+      textParts.push({ id: `section_${idx}`, text: sec.script });
+    }
+  });
 
   for (let i = 0; i < textParts.length; i++) {
     const { id, text } = textParts[i];
