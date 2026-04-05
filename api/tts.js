@@ -18,7 +18,7 @@ export default async function handler(req, res) {
       '따뜻하고 친근한 목소리로, 육아에 지친 부모님께 말하듯 천천히 또렷하게 읽어주세요.';
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-pro-preview-tts',
+      model: 'gemini-2.5-flash-preview-tts',
     });
 
     const selectedVoice = voiceName || 'Kore';
