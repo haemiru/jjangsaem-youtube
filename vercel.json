@@ -1,4 +1,10 @@
 {
+  "functions": {
+    "api/stt.js": {
+      "maxDuration": 120,
+      "memory": 1024
+    }
+  },
   "rewrites": [
     { "source": "/api/anthropic/(.*)", "destination": "/api/anthropic" },
     { "source": "/api/youtube/(.*)", "destination": "/api/youtube" },

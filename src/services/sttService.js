@@ -32,33 +32,14 @@ export async function getAudioDurationFromFile(file) {
 }
 
 /**
- * Call Gemini STT to align audio timestamps to script sections
+ * Align audio to sections using proportional character-based timing.
+ * STT via Gemini API is skipped due to Vercel body size limits (4.5MB).
+ * Proportional splitting with punctuation weighting provides reasonable results.
  */
 export async function alignAudioToSections(audioFile, scriptSections, onProgress) {
-  onProgress?.({ step: 'stt', label: '음성 분석 중 (타임스탬프 추출)...' });
-
-  const base64 = await fileToBase64(audioFile);
-  const mimeType = audioFile.type || 'audio/wav';
-  const sectionTexts = scriptSections.map(s => s.script || s.text || '');
-
-  const res = await fetch('/api/stt', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      audioBase64: base64,
-      mimeType,
-      sections: sectionTexts,
-    })
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    console.warn('STT alignment failed, falling back to proportional split:', err);
-    return null; // fallback to proportional
-  }
-
-  const data = await res.json();
-  return data.segments;
+  onProgress?.({ step: 'stt', label: '섹션별 타이밍 계산 중...' });
+  // Return null to use proportional fallback in buildTimingsFromAlignment
+  return null;
 }
 
 /**
@@ -75,13 +56,19 @@ export function buildTimingsFromAlignment(segments, scriptSections, totalDuratio
     }));
   }
 
-  // Fallback: proportional split by character count
-  const totalChars = scriptSections.reduce((sum, s) => sum + (s.script || s.text || '').length, 0);
-  if (totalChars === 0) return [];
+  // Proportional split by character count (weighted by punctuation for natural pacing)
+  const sectionWeights = scriptSections.map(s => {
+    const text = s.script || s.text || '';
+    // Add weight for punctuation marks (pauses)
+    const punctCount = (text.match(/[.!?。，,\n]/g) || []).length;
+    return text.length + punctCount * 3;
+  });
+  const totalWeight = sectionWeights.reduce((sum, w) => sum + w, 0);
+  if (totalWeight === 0) return [];
 
   return scriptSections.map((sec, idx) => {
     const text = sec.script || sec.text || '';
-    const ratio = text.length / totalChars;
+    const ratio = sectionWeights[idx] / totalWeight;
     return {
       id: `section_${idx}`,
       audioBase64: null,
