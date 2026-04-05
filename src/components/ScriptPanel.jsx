@@ -287,14 +287,14 @@ ${isShorts ? '' : `
 Write 2 thumbnail image generation prompts in ENGLISH for A/B testing.
 - Style: clean white background + cute cartoon/illustration character (whiteboard animation style)
 - Character placed on left 30%, bold Korean keyword text (한글) displayed prominently in the right 70% area
-- Include bold Korean keyword text (한글) prominently in the right 70% area. Text MUST be Korean (한글), NEVER English. No English text allowed.
+- Do NOT include any text in the thumbnail image. No Korean text, no English text, no titles, no captions. Text will be added in post-production.
+- Character placed on the left side (30% of frame), right side should be empty space for text overlay
 - Character with emotion matching the topic (surprise, worry, joy, confidence, etc.)
 - 1~2 simple props related to the topic (arrows, icons, etc.)
-- Extremely minimal and clean design, high contrast
-- Do NOT place text in bottom 20% (reserved for subtitles). Characters and props can fill the entire frame.
+- Extremely minimal and clean design, high contrast, pure white background
 - Variant A: character + emotion focused
 - Variant B: different pose/emotion + prop variation
-- Prompt example: "YouTube thumbnail, 16:9 aspect ratio, pure white background, cute cartoon character with worried expression on left side, bold Korean text '뇌가 멈췄다' on right side, no English text..."
+- Prompt example: "YouTube thumbnail, 16:9 aspect ratio, pure white background, cute cartoon character with worried expression on left side, empty right side for text overlay, no text in image..."
 `}
 아래 JSON 형식으로만 바로 출력해. thinking 태그 쓰지 마.
 {
@@ -309,8 +309,8 @@ Write 2 thumbnail image generation prompts in ENGLISH for A/B testing.
   ],
   "final_thumbnail_copy": "최종 추천 썸네일 문구 (3~7단어, 주제 전달력 + 임팩트)",
   "thumbnail_image_prompts": [
-    { "variant": "A", "prompt": "YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left (30% of frame), character with [emotion] expression, bold Korean text '[한글 키워드]' displayed prominently on right side, simple minimal layout, whiteboard animation style, high contrast, [topic-related prop], no English text, no text in bottom 20%", "concept": "Character left + bold Korean keyword text right" },
-    { "variant": "B", "prompt": "YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left with different pose, [different emotion] expression, bold Korean text '[한글 키워드]' on right side, topic-related simple props, minimal clean layout, whiteboard animation style, no English text, no text in bottom 20%", "concept": "Different pose/emotion + Korean keyword text" }
+    { "variant": "A", "prompt": "YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left (30% of frame), character with [emotion] expression, empty right side for text overlay, simple minimal layout, whiteboard animation style, high contrast, [topic-related prop], do not include any text in the image", "concept": "Character left + empty right side for post-production text" },
+    { "variant": "B", "prompt": "YouTube thumbnail, 16:9 aspect ratio, clean pure white background, cute cartoon illustration character placed on left with different pose, [different emotion] expression, empty right side for text overlay, topic-related simple props, minimal clean layout, whiteboard animation style, do not include any text in the image", "concept": "Different pose/emotion + empty right side for post-production text" }
   ]`}
 }
 JSON만 출력. 다른 텍스트 절대 금지.`;
