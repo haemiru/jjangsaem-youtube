@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Image as ImageIcon, ArrowRight, Loader2, StopCircle, RotateCw, AlertCircle, Play, Upload, Edit3, ChevronUp, Download, X, ZoomIn, ArrowUp, ArrowDown, Film, Save, Settings2, Type } from 'lucide-react';
-import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
+import { synthesizeFullScript, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
 import { alignAudioToSections, buildTimingsFromAlignment, getAudioDurationFromFile } from '../services/sttService';
 import { VideoGenerator } from '../services/videoGenerator';
 
@@ -459,35 +459,31 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
       let ttsAudios;
       let uploadedAudio = null;
 
+      // Determine audio source file (either uploaded or AI-generated)
+      let audioFile;
       if (audioMode === 'upload' && uploadedAudioFile) {
-        // --- Upload mode: analyze uploaded audio ---
-        setVideoProgress({ step: 'stt', label: '업로드된 음성 분석 중...' });
-        const scriptSections = script.sections?.length > 0 ? script.sections : (script.rows || []);
-        const totalDuration = await getAudioDurationFromFile(uploadedAudioFile);
-
-        const segments = await alignAudioToSections(uploadedAudioFile, scriptSections, setVideoProgress);
-        ttsAudios = buildTimingsFromAlignment(segments, scriptSections, totalDuration);
-        uploadedAudio = uploadedAudioFile;
-
-        setVideoProgress({ step: 'stt', label: `음성 분석 완료 (${ttsAudios.length}개 섹션 매칭)` });
+        audioFile = uploadedAudioFile;
       } else {
-        // --- TTS mode: generate per-section audio ---
-        setVideoProgress({ step: 'tts', label: '음성 합성 준비 중...' });
+        // --- TTS mode: generate full script audio in one API call ---
         const selectedStyle = STYLE_PROMPTS[ttsTone]?.find(s => s.id === ttsStyleId);
-        const ttsOpts = {
+        audioFile = await synthesizeFullScript(script, {
           stylePrompt: selectedStyle?.prompt || STYLE_PROMPTS['따뜻한'][0].prompt,
           speedRate: ttsSpeed,
           voiceName: ttsVoice,
           onProgress: setVideoProgress,
-        };
-        if (cachedTtsAudios.length > 0) {
-          setVideoProgress({ step: 'tts', label: `이전 음성 ${cachedTtsAudios.length}개 재사용, 나머지 생성 중...` });
-          ttsAudios = await synthesizeAllSections(script, { ...ttsOpts, cachedAudios: cachedTtsAudios });
-        } else {
-          ttsAudios = await synthesizeAllSections(script, ttsOpts);
-        }
-        setCachedTtsAudios(ttsAudios);
+        });
       }
+
+      // --- Analyze audio and align to sections ---
+      setVideoProgress({ step: 'stt', label: '음성 분석 중 (섹션별 타이밍 매칭)...' });
+      const scriptSections = script.sections?.length > 0 ? script.sections : (script.rows || []);
+      const totalDuration = await getAudioDurationFromFile(audioFile);
+
+      const segments = await alignAudioToSections(audioFile, scriptSections, setVideoProgress);
+      ttsAudios = buildTimingsFromAlignment(segments, scriptSections, totalDuration);
+      uploadedAudio = audioFile;
+
+      setVideoProgress({ step: 'stt', label: `음성 분석 완료 (${ttsAudios.length}개 섹션 매칭)` });
 
       if (videoGenRef.current?.aborted) return;
 
@@ -1112,14 +1108,9 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
                   </button>
                   {videoError && (
                     <div style={{ padding: '0.75rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', fontSize: '0.875rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626', marginBottom: cachedTtsAudios.length > 0 ? '0.5rem' : 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626' }}>
                         <AlertCircle size={16} /> {videoError}
                       </div>
-                      {cachedTtsAudios.length > 0 && (
-                        <div style={{ fontSize: '0.8rem', color: '#92400e' }}>
-                          음성 {cachedTtsAudios.length}개가 캐시되어 있어 이어서 생성됩니다.
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>

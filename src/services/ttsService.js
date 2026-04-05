@@ -93,51 +93,31 @@ export async function getAudioDuration(base64Audio) {
   }
 }
 
-export async function synthesizeAllSections(script, { stylePrompt, speedRate = DEFAULT_SPEED_RATE, voiceName = 'Kore', onProgress, cachedAudios = [] } = {}) {
-  const items = [];
-
-  const textParts = [];
-  // 오프닝/엔딩은 TTS 없이 타임라인 duration 사용 (타이틀카드/엔드카드)
-  // 섹션만 1:1로 TTS 생성 — 각 섹션 이미지와 정확히 매칭
+/**
+ * Generate TTS for the full script in a single API call.
+ * Returns a WAV audio File object (like user-uploaded narration).
+ */
+export async function synthesizeFullScript(script, { stylePrompt, speedRate = DEFAULT_SPEED_RATE, voiceName = 'Kore', onProgress } = {}) {
   const ttsSource = script.sections?.length > 0 ? script.sections : (script.rows || []);
-  ttsSource.forEach((sec, idx) => {
-    if (sec.script) {
-      textParts.push({ id: `section_${idx}`, text: sec.script });
-    }
-  });
+  const fullText = ttsSource
+    .map(sec => sec.script || '')
+    .filter(t => t.length > 0)
+    .join('\n\n');
 
-  for (let i = 0; i < textParts.length; i++) {
-    const { id, text } = textParts[i];
+  if (!fullText) throw new Error('대본 텍스트가 없습니다.');
 
-    // Resume: skip if already cached
-    const cached = cachedAudios.find(a => a.id === id);
-    if (cached) {
-      items.push(cached);
-      onProgress?.({
-        step: 'tts',
-        current: i + 1,
-        total: textParts.length,
-        label: `음성 캐시 사용 (${i + 1}/${textParts.length})`
-      });
-      continue;
-    }
+  onProgress?.({ step: 'tts', label: '전체 음성 생성 중... (1회 요청)' });
 
-    onProgress?.({
-      step: 'tts',
-      current: i + 1,
-      total: textParts.length,
-      label: `음성 생성 중... (${i + 1}/${textParts.length})`
-    });
+  const audioBase64 = await synthesizeSpeech(fullText, { stylePrompt, speedRate, voiceName });
 
-    const audioBase64 = await synthesizeSpeech(text, { stylePrompt, speedRate, voiceName });
-    const duration = await getAudioDuration(audioBase64);
+  // Convert base64 WAV to File object (for unified handling with upload mode)
+  onProgress?.({ step: 'tts', label: '음성 파일 변환 중...' });
+  const binary = atob(audioBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-    items.push({ id, audioBase64, duration, text });
+  const blob = new Blob([bytes], { type: 'audio/wav' });
+  const file = new File([blob], 'tts_narration.wav', { type: 'audio/wav' });
 
-    if (i < textParts.length - 1) {
-      await new Promise(r => setTimeout(r, DELAY_BETWEEN_CALLS));
-    }
-  }
-
-  return items;
+  return file;
 }
