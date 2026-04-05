@@ -278,7 +278,12 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
       items.push({ id: `section_${idx}`, label: sectionLabel, prompt: `${sec.image_prompt}${keywordInstruction}${suffix}`, status: 'idle', url: null });
     });
 
-    // Thumbnails — skip for Shorts (Nick Invests style: white bg + cartoon character + bold text)
+    const outroPrompt = script.outro_image_prompt
+      ? `${script.outro_image_prompt}${suffix}`
+      : `Warm and clean ending card background, soft gradient, subtle sparkle effects, empty center area for text overlay, suitable for thank you message and channel subscription CTA, Korean text only if needed, no English text.${suffix}`;
+    items.push({ id: 'outro', label: '엔딩', prompt: outroPrompt, status: 'idle', url: null });
+
+    // Thumbnails — after outro, skip for Shorts
     if (!isShorts) {
       const thumbNoText = '. CRITICAL: Do not include any text, titles, headlines, captions, or Korean text in the image. The image must contain only the character and props, absolutely no text at all. Leave the right side empty for post-production text overlay.';
       let thumbBasePrompt = script.thumbnailImagePrompts?.[0]?.prompt
@@ -293,11 +298,6 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
       items.push({ id: 'thumb_a', label: '썸네일 A', prompt: `${thumbBasePrompt}${thumbNoText}${suffix}`, status: 'idle', url: null });
       items.push({ id: 'thumb_b', label: '썸네일 B', prompt: `${thumbAltPrompt}${thumbNoText}${suffix}`, status: 'idle', url: null });
     }
-
-    const outroPrompt = script.outro_image_prompt
-      ? `${script.outro_image_prompt}${suffix}`
-      : `Warm and clean ending card background, soft gradient, subtle sparkle effects, empty center area for text overlay, suitable for thank you message and channel subscription CTA, Korean text only if needed, no English text.${suffix}`;
-    items.push({ id: 'outro', label: '엔딩', prompt: outroPrompt, status: 'idle', url: null });
 
     setQueue(items);
   }, [script, benchmark, isShorts]);
