@@ -161,25 +161,53 @@ export async function synthesizeChunkedScript(script, { stylePrompt, speedRate =
     }
   }
 
-  // Build per-section ttsAudios with proportional timing within each chunk
-  onProgress?.({ step: 'tts', label: '섹션별 타이밍 계산 중...' });
+  // Analyze each chunk with STT to get accurate per-section timestamps
+  onProgress?.({ step: 'stt', label: '음성 분석 중 (섹션별 타이밍 매칭)...' });
   const ttsAudios = new Array(ttsSource.length);
 
-  for (const part of allAudioParts) {
-    // Proportional split within this chunk
-    const sectionWeights = part.sections.map(s => {
-      const text = s.script || '';
-      const punctCount = (text.match(/[.!?。，,\n]/g) || []).length;
-      return text.length + punctCount * 3;
-    });
-    const totalWeight = sectionWeights.reduce((sum, w) => sum + w, 0);
+  for (let i = 0; i < allAudioParts.length; i++) {
+    const part = allAudioParts[i];
+    onProgress?.({ step: 'stt', label: `음성 분석 중... (${i + 1}/${allAudioParts.length})` });
 
+    const sectionTexts = part.sections.map(s => s.script || '');
+
+    // Try STT alignment for this chunk
+    let segments = null;
+    try {
+      const res = await fetch('/api/stt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioBase64: part.base64,
+          mimeType: 'audio/wav',
+          sections: sectionTexts,
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        segments = data.segments;
+      } else {
+        console.warn(`STT chunk ${i + 1} failed:`, await res.text());
+      }
+    } catch (e) {
+      console.warn(`STT chunk ${i + 1} error:`, e);
+    }
+
+    // Assign durations from STT or fallback to proportional
     part.sectionIndices.forEach((globalIdx, localIdx) => {
-      const ratio = totalWeight > 0 ? sectionWeights[localIdx] / totalWeight : 1 / part.sections.length;
+      let duration;
+      if (segments && segments[localIdx]) {
+        duration = Math.max(0.5, (segments[localIdx].endTime || 0) - (segments[localIdx].startTime || 0));
+      } else {
+        // Fallback: proportional within chunk
+        const totalChars = sectionTexts.reduce((sum, t) => sum + t.length, 0);
+        const ratio = totalChars > 0 ? sectionTexts[localIdx].length / totalChars : 1 / sectionTexts.length;
+        duration = Math.max(0.5, part.duration * ratio);
+      }
       ttsAudios[globalIdx] = {
         id: `section_${globalIdx}`,
         audioBase64: null,
-        duration: Math.max(0.5, part.duration * ratio),
+        duration,
         text: part.sections[localIdx]?.script || '',
       };
     });
