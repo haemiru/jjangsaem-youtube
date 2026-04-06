@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Image as ImageIcon, ArrowRight, Loader2, StopCircle, RotateCw, AlertCircle, Play, Upload, Edit3, ChevronUp, Download, X, ZoomIn, ArrowUp, ArrowDown, Film, Save, Settings2, Type } from 'lucide-react';
-import { synthesizeChunkedScript, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
+import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEED_OPTIONS, DEFAULT_SPEED_RATE } from '../services/ttsService';
 import { buildTimingsFromAlignment, getAudioDurationFromFile } from '../services/sttService';
 import { VideoGenerator } from '../services/videoGenerator';
 
@@ -471,16 +471,15 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
         ttsAudios = buildTimingsFromAlignment(null, scriptSections, totalDuration);
         uploadedAudio = uploadedAudioFile;
       } else {
-        // --- TTS mode: generate in 3 chunks (grouped by section type) ---
+        // --- TTS mode: generate per-section audio ---
+        setVideoProgress({ step: 'tts', label: '음성 합성 준비 중...' });
         const selectedStyle = STYLE_PROMPTS[ttsTone]?.find(s => s.id === ttsStyleId);
-        const result = await synthesizeChunkedScript(script, {
+        ttsAudios = await synthesizeAllSections(script, {
           stylePrompt: selectedStyle?.prompt || STYLE_PROMPTS['따뜻한'][0].prompt,
           speedRate: ttsSpeed,
           voiceName: ttsVoice,
           onProgress: setVideoProgress,
         });
-        ttsAudios = result.ttsAudios;
-        uploadedAudio = result.audioFile;
       }
 
       setVideoProgress({ step: 'tts', label: `음성 준비 완료 (${ttsAudios.length}개 섹션)` });
