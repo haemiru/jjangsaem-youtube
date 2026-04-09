@@ -76,14 +76,15 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
     ? `캐릭터 설명: ${plan.characterDescription}`
     : '업로드된 캐릭터 이미지를 참고';
 
+  // row 수를 약 1.5~2배로 늘려 이미지가 더 자주 바뀌도록 (시청자 지루함 방지)
   const lengthGuide = (() => {
     const f = plan.format;
-    if (f === '쇼츠 15~30초') return { rows: '8~16', chars: '300~500', time: '15~30초' };
-    if (f === '쇼츠 60초') return { rows: '16~28', chars: '700~1000', time: '50~60초' };
-    if (f === '일반 4~5분') return { rows: '60~80', chars: '3000~4000', time: '4~5분' };
-    if (f === '일반 8~10분') return { rows: '100~140', chars: '6000~8000', time: '8~10분' };
-    if (f === '일반 10분 이상') return { rows: '140~180', chars: '8000~11000', time: '10분 이상' };
-    return { rows: '60~100', chars: '4000~6000', time: '5~10분' };
+    if (f === '쇼츠 15~30초') return { rows: '14~22', chars: '300~500', time: '15~30초' };
+    if (f === '쇼츠 60초') return { rows: '28~44', chars: '700~1000', time: '50~60초' };
+    if (f === '일반 4~5분') return { rows: '100~130', chars: '3000~4000', time: '4~5분' };
+    if (f === '일반 8~10분') return { rows: '170~220', chars: '6000~8000', time: '8~10분' };
+    if (f === '일반 10분 이상') return { rows: '230~290', chars: '8000~11000', time: '10분 이상' };
+    return { rows: '100~160', chars: '4000~6000', time: '5~10분' };
   })();
 
   // CTA 다양화 — 매 생성마다 랜덤 스타일 1~2개 선택, 일정 확률로 구독/좋아요 멘트 포함
@@ -117,6 +118,7 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
         : '이번 영상은 구독·좋아요 멘트는 생략하고, 위 스타일에만 집중하세요.',
       '⚠️ 다음 표현은 식상하므로 사용 금지: "이건 꼭 부모님이 알아야 합니다", "유용하면 저장하세요", "주변 부모님께 공유해주세요" (똑같은 문장 그대로). 같은 의도라도 새로운 표현으로 바꿔 쓸 것.',
       '⚠️ CTA는 단순 명령형이 아니라, 본문에서 다룬 핵심 내용과 자연스럽게 이어지도록 한 문장 이상의 맥락과 함께 작성하세요.',
+      '⚠️ 대본의 맨 마지막 row는 반드시 마무리 인사로 끝낼 것. 예: "오늘도 시청해주셔서 감사합니다", "끝까지 함께해주셔서 감사해요", "다음 영상에서 또 만나요". 매번 표현은 다르게 변형. (구독·좋아요 멘트와는 별도의 row로 분리 가능)',
     ];
     return lines.join('\n');
   };
@@ -260,7 +262,10 @@ ${pickCtaGuide()}
 - 끝 = 저장/공유 유도
 
 [출력 규칙]
-1. 대본을 1~2문장 단위로 끊어서 rows 배열에 넣어줘 (총 ${lengthGuide.rows}개 row)
+1. 대본을 짧게 끊어서 rows 배열에 넣어줘 (총 ${lengthGuide.rows}개 row).
+   - 한 row 당 한 호흡(약 15~30자, 길어도 1문장) 단위로 잘라야 함. 절대 2문장을 한 row에 넣지 말 것.
+   - 한 문장이 길면 쉼표/접속사 단위로 잘라 여러 row로 분할해도 됨 (예: "많은 부모님들이 / 괜찮다고 생각하지만 / 사실은 그렇지 않습니다" → 3 row).
+   - 이렇게 잘게 자르는 이유: row 1개당 이미지가 1장이라, 잘게 자를수록 화면 전환이 빨라져서 시청자가 덜 지루해짐.
 2. 각 row에 section 필드를 반드시 포함 — 값은 ${isShorts ? '"hook", "explain", "core", "cta"' : '"hook", "empathy", "twist", "core", "solution", "cta"'} 중 하나
 3. 각 row의 image_prompt: Write in ENGLISH. A prompt to visualize the sentence as an image.
    - Must include "white background"
