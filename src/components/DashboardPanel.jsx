@@ -266,8 +266,14 @@ export default function DashboardPanel({ globalState, onNavigate, updateState })
             const completedCount = seriesPlan.items.filter(it => it.status === 'completed').length;
 
             const handleContinue = () => {
+              // 현재 영상 대본 요약을 저장 (다음 영상 차별화용)
+              const scriptSummary = script?.final_hook ? {
+                hook: script.final_hook?.text || '',
+                keyPoints: (script.rows || []).filter(r => r.section === 'core' || r.section === 'twist').slice(0, 3).map(r => r.script).join(' / ')
+              } : null;
+
               const newItems = seriesPlan.items.map(it => {
-                if (it.status === 'current') return { ...it, status: 'completed' };
+                if (it.status === 'current') return { ...it, status: 'completed', ...(scriptSummary && { scriptSummary }) };
                 return it;
               });
               if (nextItem) {
@@ -280,7 +286,7 @@ export default function DashboardPanel({ globalState, onNavigate, updateState })
                 updateState('plan', { ...plan, topic: nextItem.title, format: nextItem.format });
                 updateState('script', { hook: '', empathy: '', twist: '', sections: [], cta: '', titleSuggestions: [], thumbnailCopies: [] });
                 updateState('benchmark', { channels: [], thumbnailPatterns: [], titleFormulas: [], tagPool: [] });
-                updateState('metadata', { title: '', description: '', tags: [], hashtags: [], cotLog: '' });
+                updateState('metadata', { title: '', description: '', tags: [], hashtags: '', cotLog: '' });
                 updateState('upload', { scheduleType: '', scheduledAt: '', visibility: '', uploadStatus: '' });
               }
               onNavigate('plan');

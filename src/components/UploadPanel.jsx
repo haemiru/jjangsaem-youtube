@@ -625,9 +625,15 @@ JSON만 출력.`;
                 if (seriesPlan.items.length === 0) return null;
 
                 const handleContinue = () => {
-                  // Mark current as completed
+                  // 현재 영상 대본 요약을 저장 (다음 영상 차별화용)
+                  const scriptSummary = script?.final_hook ? {
+                    hook: script.final_hook?.text || '',
+                    keyPoints: (script.rows || []).filter(r => r.section === 'core' || r.section === 'twist').slice(0, 3).map(r => r.script).join(' / ')
+                  } : null;
+
+                  // Mark current as completed (with script summary)
                   const newItems = seriesPlan.items.map(it => {
-                    if (it.status === 'current') return { ...it, status: 'completed' };
+                    if (it.status === 'current') return { ...it, status: 'completed', ...(scriptSummary && { scriptSummary }) };
                     return it;
                   });
                   // Mark next as current

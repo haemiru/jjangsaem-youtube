@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FileText, Play, CheckCircle2, ChevronDown, ChevronUp, Image as ImageIcon, RefreshCw, Type, Loader2, ArrowRight, Copy, Check } from 'lucide-react';
 
 export default function ScriptPanel({ globalState, updateState, onNext }) {
-  const { plan, benchmark, settings, script: globalScript } = globalState;
+  const { plan, benchmark, settings, script: globalScript, seriesPlan } = globalState;
 
   const [streamText, setStreamText] = useState('');
   const [currentStep, setCurrentStep] = useState(0); // 0: idle, 1: hook, 2: rows, 3: titles, 4: done
@@ -151,6 +151,21 @@ section 배분 가이드:
    - solution: 전체의 약 25%
    - cta: 1~3개 row`;
 
+  // 시리즈 내 이전 완료 영상들의 대본 요약 컨텍스트
+  const buildPrevVideosContext = () => {
+    if (!seriesPlan?.items?.length) return '';
+    const completed = seriesPlan.items.filter(it => it.status === 'completed' && it.scriptSummary);
+    if (completed.length === 0) return '';
+    const lines = completed.map((it, i) =>
+      `  ${i + 1}. "${it.title}" — 훅: ${it.scriptSummary.hook} / 핵심: ${it.scriptSummary.keyPoints}`
+    );
+    return `\n[⚠️ 같은 시리즈의 이전 영상들 — 반드시 차별화할 것]
+아래는 이미 완료된 영상들의 훅과 핵심 내용입니다.
+이번 영상은 아래와 다른 훅 유형, 다른 도입부, 다른 설명 각도를 사용하세요.
+같은 문장 구조, 같은 감정 레버, 같은 비유를 반복하지 마세요.
+${lines.join('\n')}\n`;
+  };
+
   const buildHookPrompt = () => {
     return isShorts
       ? `다음 정보를 바탕으로 유튜브 쇼츠의 훅(Hook)을 기획해줘.
@@ -163,7 +178,7 @@ section 배분 가이드:
 연관 전자책: ${plan.ebookName}
 전자책 요약본: ${plan.ebookSummary || '(없음)'}
 벤치마킹 감정 트리거: ${benchmark.titleFormulas?.triggerWords?.join(', ') || '없음'}
-
+${buildPrevVideosContext()}
 [쇼츠 영상 구조 — 4단계]
 ❶ Hook — 공포 또는 궁금증 유발 (첫 1~2초)
 ❷ 설명 — 핵심 내용 빠르게 전달
@@ -198,7 +213,7 @@ JSON만 출력.`
 연관 전자책: ${plan.ebookName}
 전자책 요약본: ${plan.ebookSummary || '(없음)'}
 벤치마킹 감정 트리거: ${benchmark.titleFormulas?.triggerWords?.join(', ') || '없음'}
-
+${buildPrevVideosContext()}
 [바이럴 영상 공식 — 6단계 구조]
 ❶ Hook (3초) — 공포 또는 궁금증 유발
 ❷ 공감 — 부모 마음을 잡는 공감 문장
@@ -238,7 +253,7 @@ ${!isShorts ? `공감: ${hookResult.empathy}\n반전: ${hookResult.twist}` : ''}
 
 포맷: ${plan.format}
 연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
-
+${buildPrevVideosContext()}
 ${structureGuide}
 
 ${pickCtaGuide()}
