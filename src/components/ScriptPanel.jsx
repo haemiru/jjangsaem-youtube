@@ -256,40 +256,8 @@ JSON으로 출력:
 JSON만 출력.`;
   };
 
-  const buildRowsPrompt = (hookResult) => {
-    return `위에서 기획한 요소를 이어받아, 전체 대본을 작성해줘.
-
-[기획된 요소]
-훅: ${hookResult.final_hook.text}
-${!isShorts ? `공감: ${hookResult.empathy}\n반전: ${hookResult.twist}` : ''}
-
-포맷: ${plan.format}
-연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
-${buildPrevVideosContext()}
-${structureGuide}
-
-${pickCtaGuide()}
-
-[분량 기준 — 매우 중요! 반드시 지켜야 합니다]
-- 목표 영상 길이: ${lengthGuide.time}
-- row 수: ${lengthGuide.rows}개
-- 전체 대본 총 글자 수: ${lengthGuide.chars}자
-- 한국어 나레이션 기준 약 300자 = 1분입니다. 이 기준에 맞춰 분량을 조절하세요.
-- 반드시 총 글자 수 기준을 지켜주세요. 목표 글자 수보다 적게 쓰면 안 됩니다. 최소 글자 수 이상 반드시 작성하세요.
-
-[스타일 가이드]
-- 이 영상은 특정 캐릭터를 활용한 화이트보드 애니메이션 스타일입니다.
-- ${charDesc}
-- 모든 이미지는 흰색 배경 위에 캐릭터와 간단한 텍스트/아이콘으로 구성됩니다.
-- Nick Invests 채널처럼 깔끔하고 미니멀한 교육 콘텐츠 스타일입니다.
-
-[알고리즘 핵심 전략]
-- 첫 3초 = 공포 or 궁금증
-- 중간 = 반전 (행동 → 뇌)
-- 끝 = 저장/공유 유도
-
-[출력 규칙]
-1. 대본을 짧게 끊어서 rows 배열에 넣어줘 (총 ${lengthGuide.rows}개 row).
+  const rowOutputRules = `[출력 규칙]
+1. 대본을 짧게 끊어서 rows 배열에 넣어줘.
    - 한 row 당 한 호흡(약 15~30자, 길어도 1문장) 단위로 잘라야 함. 절대 2문장을 한 row에 넣지 말 것.
    - 한 문장이 길면 쉼표/접속사 단위로 잘라 여러 row로 분할해도 됨 (예: "많은 부모님들이 / 괜찮다고 생각하지만 / 사실은 그렇지 않습니다" → 3 row).
    - 이렇게 잘게 자르는 이유: row 1개당 이미지가 1장이라, 잘게 자를수록 화면 전환이 빨라져서 시청자가 덜 지루해짐.
@@ -316,10 +284,114 @@ JSON 출력:
       "image_prompt": "White background, cartoon character standing with surprised expression, small question mark icon floating above head, minimalist design, Korean text '위험 신호' inside a speech bubble near character's head, no other text or headlines, no English text",
       "video_prompt": "Camera slowly zooms into character, question mark icon bounces, character's eyes widen"
     }
-  ],
-  "full_script": "전체 대본을 이어붙인 텍스트 (복사용)"
+  ]
 }
 JSON만 출력.`;
+
+  const styleGuide = `[스타일 가이드]
+- 이 영상은 특정 캐릭터를 활용한 화이트보드 애니메이션 스타일입니다.
+- ${charDesc}
+- 모든 이미지는 흰색 배경 위에 캐릭터와 간단한 텍스트/아이콘으로 구성됩니다.
+- Nick Invests 채널처럼 깔끔하고 미니멀한 교육 콘텐츠 스타일입니다.`;
+
+  // 롱폼은 2회에 나눠서 생성 (전반부/후반부)
+  const needsSplit = !isShorts;
+
+  const buildRowsPrompt = (hookResult) => {
+    if (needsSplit) {
+      // 롱폼 전반부: hook ~ core 중간까지
+      return `위에서 기획한 요소를 이어받아, 대본의 전반부를 작성해줘.
+
+[기획된 요소]
+훅: ${hookResult.final_hook.text}
+공감: ${hookResult.empathy}
+반전: ${hookResult.twist}
+
+포맷: ${plan.format}
+연계 전자책: ${plan.ebookName}
+${buildPrevVideosContext()}
+${structureGuide}
+
+[분량 기준 — 전반부]
+- 전체 목표 영상 길이: ${lengthGuide.time}
+- 전체 row 수: ${lengthGuide.rows}개
+- 이번에는 전반부(hook → empathy → twist → core 전반)만 작성
+- 전체의 약 55~60% 분량을 이번에 작성 (row 수 기준)
+- core 섹션은 핵심 설명의 전반부까지만 작성하고, 자연스럽게 이어질 수 있는 지점에서 끊어줘
+- 마지막 row의 다음에 이어서 쓸 수 있도록 내용을 마무리하지 말 것
+
+${styleGuide}
+
+[알고리즘 핵심 전략]
+- 첫 3초 = 공포 or 궁금증
+- 중간 = 반전 (행동 → 뇌)
+
+${rowOutputRules}`;
+    }
+
+    // 쇼츠: 한 번에 전체 생성
+    return `위에서 기획한 요소를 이어받아, 전체 대본을 작성해줘.
+
+[기획된 요소]
+훅: ${hookResult.final_hook.text}
+
+포맷: ${plan.format}
+연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
+${buildPrevVideosContext()}
+${structureGuide}
+
+${pickCtaGuide()}
+
+[분량 기준 — 매우 중요! 반드시 지켜야 합니다]
+- 목표 영상 길이: ${lengthGuide.time}
+- row 수: ${lengthGuide.rows}개
+- 전체 대본 총 글자 수: ${lengthGuide.chars}자
+- 한국어 나레이션 기준 약 300자 = 1분입니다. 이 기준에 맞춰 분량을 조절하세요.
+
+${styleGuide}
+
+[알고리즘 핵심 전략]
+- 첫 3초 = 공포 or 궁금증
+- 중간 = 반전 (행동 → 뇌)
+- 끝 = 저장/공유 유도
+
+${rowOutputRules}`;
+  };
+
+  const buildRowsContinuePrompt = (firstHalfRows) => {
+    const lastScript = firstHalfRows.slice(-3).map(r => r.script).join(' / ');
+    const firstHalfCount = firstHalfRows.length;
+    const ctaGuide = pickCtaGuide();
+
+    return `위 전반부 대본에 이어서 후반부를 작성해줘.
+
+[현재까지 작성된 분량]
+- 전반부 row 수: ${firstHalfCount}개
+- 전반부 마지막 내용: "${lastScript}"
+
+[후반부에 작성할 내용]
+- core 섹션의 나머지 부분
+- solution 섹션 (BEFORE→AFTER, 바로 따라할 수 있는 실용 솔루션)
+- cta 섹션
+
+포맷: ${plan.format}
+연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
+
+${ctaGuide}
+
+[분량 기준 — 후반부]
+- 전체 목표 row 수: ${lengthGuide.rows}개
+- 전반부에서 ${firstHalfCount}개 작성했으므로 나머지를 채워줘
+- 전체 대본 총 글자 수: ${lengthGuide.chars}자 (전반부와 합산하여 이 범위에 맞춰야 함)
+- 반드시 solution과 cta 섹션을 포함할 것
+- 대본의 맨 마지막 row는 반드시 마무리 인사로 끝낼 것
+
+${styleGuide}
+
+[알고리즘 핵심 전략]
+- 끝 = 저장/공유 유도
+
+${rowOutputRules}`;
   };
 
   const buildTitlePrompt = (rowsResult) => {
@@ -468,25 +540,58 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
 
       // ===== STEP 2: SENTENCE-LEVEL ROWS (대본 + 이미지 프롬프트 + 영상 프롬프트) =====
       setCurrentStep(2);
-      setStreamText(prev => prev + '\n\n=== [2/3] 문장 단위 대본 + 이미지/영상 프롬프트 생성 중 ===\n\n');
 
-      const rowsPrompt = buildRowsPrompt(hookResult);
+      if (needsSplit) {
+        // === 롱폼: 2회 분할 생성 ===
+        // Step 2a: 전반부
+        setStreamText(prev => prev + '\n\n=== [2/4] 대본 전반부 생성 중 (hook → core 전반) ===\n\n');
+        const rowsPrompt1 = buildRowsPrompt(hookResult);
+        chatHistory.push({ role: "user", content: rowsPrompt1 });
+        const rows1Text = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
+          setStreamText(prev => prev + chunk);
+        }, 16000);
+        if (!rows1Text || rows1Text.trim().length === 0) throw new Error("전반부 대본 생성 단계에서 API 응답이 비어있습니다.");
+        chatHistory.push({ role: "assistant", content: rows1Text });
 
-      chatHistory.push({ role: "user", content: rowsPrompt });
-      // 롱폼 영상은 row가 170~220개로 출력이 매우 크므로 max_tokens를 늘림
-      const rowsMaxTokens = isShorts ? 16000 : 32000;
-      const rowsResponseText = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
-        setStreamText(prev => prev + chunk);
-      }, rowsMaxTokens);
-      if (!rowsResponseText || rowsResponseText.trim().length === 0) throw new Error("본문 대본 생성 단계에서 API 응답이 비어있습니다.");
-      chatHistory.push({ role: "assistant", content: rowsResponseText });
+        const rows1Result = parseJSON(rows1Text);
+        if (!rows1Result?.rows) throw new Error("전반부 대본 JSON 파싱 실패\n응답: " + rows1Text.substring(0, 300));
 
-      rowsResult = parseJSON(rowsResponseText);
-      if (!rowsResult) throw new Error("본문 대본 생성 단계에서 JSON 파싱 실패\n응답: " + rowsResponseText.substring(0, 300));
+        // Step 2b: 후반부
+        setStreamText(prev => prev + '\n\n=== [3/4] 대본 후반부 생성 중 (core 후반 → solution → cta) ===\n\n');
+        const rowsPrompt2 = buildRowsContinuePrompt(rows1Result.rows);
+        chatHistory.push({ role: "user", content: rowsPrompt2 });
+        const rows2Text = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
+          setStreamText(prev => prev + chunk);
+        }, 16000);
+        if (!rows2Text || rows2Text.trim().length === 0) throw new Error("후반부 대본 생성 단계에서 API 응답이 비어있습니다.");
+        chatHistory.push({ role: "assistant", content: rows2Text });
+
+        const rows2Result = parseJSON(rows2Text);
+        if (!rows2Result?.rows) throw new Error("후반부 대본 JSON 파싱 실패\n응답: " + rows2Text.substring(0, 300));
+
+        // 전반부 + 후반부 합치기
+        const allRows = [...rows1Result.rows, ...rows2Result.rows];
+        const fullScript = allRows.map(r => r.script).join('\n');
+        rowsResult = { rows: allRows, full_script: fullScript };
+
+      } else {
+        // === 쇼츠: 한 번에 생성 ===
+        setStreamText(prev => prev + '\n\n=== [2/3] 문장 단위 대본 + 이미지/영상 프롬프트 생성 중 ===\n\n');
+        const rowsPrompt = buildRowsPrompt(hookResult);
+        chatHistory.push({ role: "user", content: rowsPrompt });
+        const rowsResponseText = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
+          setStreamText(prev => prev + chunk);
+        });
+        if (!rowsResponseText || rowsResponseText.trim().length === 0) throw new Error("본문 대본 생성 단계에서 API 응답이 비어있습니다.");
+        chatHistory.push({ role: "assistant", content: rowsResponseText });
+
+        rowsResult = parseJSON(rowsResponseText);
+        if (!rowsResult) throw new Error("본문 대본 생성 단계에서 JSON 파싱 실패\n응답: " + rowsResponseText.substring(0, 300));
+      }
 
       // ===== STEP 3: TITLES & THUMBNAILS =====
       setCurrentStep(3);
-      setStreamText(prev => prev + '\n\n=== [3/3] 제목 및 썸네일 기획 중 ===\n\n');
+      setStreamText(prev => prev + `\n\n=== [${needsSplit ? '4/4' : '3/3'}] 제목 및 썸네일 기획 중 ===\n\n`);
 
       const titlePrompt = buildTitlePrompt(rowsResult);
 
