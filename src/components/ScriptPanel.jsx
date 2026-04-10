@@ -12,9 +12,10 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
   const [copiedId, setCopiedId] = useState(null);
   const [ttsSpeedLabel, setTtsSpeedLabel] = useState('1x');
   const [mode, setMode] = useState(null); // null: not chosen, 'auto', 'manual'
-  const [manualStep, setManualStep] = useState(1); // 1: hook, 2: rows, 3: titles
+  const [manualStep, setManualStep] = useState(1); // 1: hook, 2: rows (or rows-part1), 3: rows-part2 or titles, 4: titles (longform)
   const [manualInput, setManualInput] = useState('');
   const [manualHookResult, setManualHookResult] = useState(null);
+  const [manualRowsPart1, setManualRowsPart1] = useState(null);
   const [manualRowsResult, setManualRowsResult] = useState(null);
   const [manualError, setManualError] = useState('');
 
@@ -458,6 +459,8 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
   };
 
   // === Manual mode: parse & save results ===
+  const manualTotalSteps = needsSplit ? 4 : 3;
+
   const handleManualSubmit = () => {
     setManualError('');
     const parsed = parseJSON(manualInput);
@@ -472,13 +475,26 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
       setManualHookResult(parsed);
       setManualStep(2);
       setManualInput('');
-    } else if (manualStep === 2) {
-      // Rows result
+    } else if (manualStep === 2 && needsSplit) {
+      // 롱폼 전반부 rows
       if (!parsed.rows) { setManualError('rows 필드가 없습니다.'); return; }
-      setManualRowsResult(parsed);
+      setManualRowsPart1(parsed);
       setManualStep(3);
       setManualInput('');
-    } else if (manualStep === 3) {
+    } else if ((manualStep === 2 && !needsSplit) || (manualStep === 3 && needsSplit)) {
+      // 쇼츠 전체 rows / 롱폼 후반부 rows
+      if (!parsed.rows) { setManualError('rows 필드가 없습니다.'); return; }
+      if (needsSplit) {
+        // 전반부 + 후반부 합치기
+        const allRows = [...(manualRowsPart1?.rows || []), ...parsed.rows];
+        const fullScript = allRows.map(r => r.script).join('\n');
+        setManualRowsResult({ rows: allRows, full_script: fullScript });
+      } else {
+        setManualRowsResult(parsed);
+      }
+      setManualStep(needsSplit ? 4 : 3);
+      setManualInput('');
+    } else if ((manualStep === 3 && !needsSplit) || (manualStep === 4 && needsSplit)) {
       // Title result — save everything
       const fullScript = manualRowsResult.full_script || manualRowsResult.rows?.map(r => r.script).join('\n') || '';
       const finalState = {
@@ -499,7 +515,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
       updateState('script', finalState);
       updateState('metadata', { ...globalState.metadata, title: parsed.final_title, description: fullScript.substring(0, 200) });
       updateState('media', { ...globalState.media, selectedThumbnailCopy: parsed.final_thumbnail_copy });
-      setManualStep(4);
+      setManualStep(manualTotalSteps + 1);
       setManualInput('');
     }
   };
@@ -507,11 +523,14 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
   const getManualPrompt = () => {
     if (manualStep === 1) return buildHookPrompt();
     if (manualStep === 2) return buildRowsPrompt(manualHookResult);
-    if (manualStep === 3) return buildTitlePrompt(manualRowsResult);
+    if (manualStep === 3 && needsSplit) return buildRowsContinuePrompt(manualRowsPart1?.rows || []);
+    if ((manualStep === 3 && !needsSplit) || (manualStep === 4 && needsSplit)) return buildTitlePrompt(manualRowsResult);
     return '';
   };
 
-  const manualStepLabels = ['', '1/3: 훅(Hook) 기획', '2/3: 대본 본문 생성', '3/3: 제목 및 썸네일'];
+  const manualStepLabels = needsSplit
+    ? ['', '1/4: 훅(Hook) 기획', '2/4: 대본 전반부', '3/4: 대본 후반부', '4/4: 제목 및 썸네일']
+    : ['', '1/3: 훅(Hook) 기획', '2/3: 대본 본문 생성', '3/3: 제목 및 썸네일'];
 
   const generateAll = async () => {
     setError('');
@@ -678,20 +697,20 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
   };
 
   // === Manual mode UI ===
-  if (mode === 'manual' && manualStep < 4 && !hasResults) {
+  if (mode === 'manual' && manualStep <= manualTotalSteps && !hasResults) {
     const prompt = getManualPrompt();
     return (
       <div className="panel-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 className="panel-title" style={{ margin: 0 }}>수동 모드 — {manualStepLabels[manualStep]}</h2>
-          <button className="btn-secondary" onClick={() => { setMode(null); setManualStep(1); setManualHookResult(null); setManualRowsResult(null); setManualInput(''); setManualError(''); }}>
+          <button className="btn-secondary" onClick={() => { setMode(null); setManualStep(1); setManualHookResult(null); setManualRowsPart1(null); setManualRowsResult(null); setManualInput(''); setManualError(''); }}>
             모드 선택으로 돌아가기
           </button>
         </div>
 
         {/* Step indicator */}
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {[1,2,3].map(s => (
+          {Array.from({ length: manualTotalSteps }, (_, i) => i + 1).map(s => (
             <div key={s} style={{ flex: 1, height: '4px', borderRadius: '2px', backgroundColor: s <= manualStep ? 'var(--primary)' : 'var(--gray-200)' }} />
           ))}
         </div>
@@ -729,7 +748,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
             onClick={handleManualSubmit}
             disabled={!manualInput.trim()}
           >
-            {manualStep < 3 ? `결과 적용 → 다음 단계 (${manualStep + 1}/3)` : '결과 적용 → 대본 완성'}
+            {manualStep < manualTotalSteps ? `결과 적용 → 다음 단계 (${manualStep + 1}/${manualTotalSteps})` : '결과 적용 → 대본 완성'}
           </button>
         </div>
       </div>
