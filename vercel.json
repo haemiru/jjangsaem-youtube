@@ -1,5 +1,8 @@
 {
   "functions": {
+    "api/anthropic.js": {
+      "maxDuration": 120
+    },
     "api/stt.js": {
       "maxDuration": 120,
       "memory": 1024

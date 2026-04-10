@@ -1,3 +1,8 @@
+export const config = {
+  supportsResponseStreaming: true,
+  maxDuration: 120,
+};
+
 export default async function handler(req, res) {
   try {
     const path = req.url.replace(/^\/api\/anthropic/, '') || '/';
@@ -18,16 +23,37 @@ export default async function handler(req, res) {
       ? (typeof req.body === 'string' ? req.body : JSON.stringify(req.body))
       : undefined;
 
+    // Check if client requested streaming
+    const isStream = body && JSON.parse(body).stream;
+
     const response = await fetch(target, {
       method: req.method,
       headers,
       body,
     });
 
-    const data = await response.text();
+    if (isStream && response.ok) {
+      // Stream SSE response back to client
+      res.setHeader('content-type', 'text/event-stream');
+      res.setHeader('cache-control', 'no-cache');
+      res.setHeader('connection', 'keep-alive');
 
-    res.setHeader('content-type', response.headers.get('content-type') || 'application/json');
-    res.status(response.status).send(data);
+      const reader = response.body.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(value);
+        }
+      } finally {
+        res.end();
+      }
+    } else {
+      // Non-streaming: return full response
+      const data = await response.text();
+      res.setHeader('content-type', response.headers.get('content-type') || 'application/json');
+      res.status(response.status).send(data);
+    }
   } catch (e) {
     res.status(500).json({ error: e.message, stack: e.stack });
   }
