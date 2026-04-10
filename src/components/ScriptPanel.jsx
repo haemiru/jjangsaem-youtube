@@ -561,29 +561,38 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
       setCurrentStep(2);
 
       if (needsSplit) {
-        // === 롱폼: 2회 분할 생성 ===
+        // === 롱폼: 2회 분할 생성 (컨텍스트 경량화) ===
         // Step 2a: 전반부
         setStreamText(prev => prev + '\n\n=== [2/4] 대본 전반부 생성 중 (hook → core 전반) ===\n\n');
         const rowsPrompt1 = buildRowsPrompt(hookResult);
-        chatHistory.push({ role: "user", content: rowsPrompt1 });
-        const rows1Text = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
+        // 전반부는 독립 호출 (hook 결과만 컨텍스트로 전달)
+        const rows1Messages = [
+          { role: "user", content: `훅 기획 결과:\n${JSON.stringify({ final_hook: hookResult.final_hook, empathy: hookResult.empathy, twist: hookResult.twist })}` },
+          { role: "assistant", content: "네, 훅 기획 결과를 확인했습니다. 대본 작성을 시작하겠습니다." },
+          { role: "user", content: rowsPrompt1 }
+        ];
+        const rows1Text = await runClaudeStream(rows1Messages, plan.model, null, (chunk) => {
           setStreamText(prev => prev + chunk);
-        }, 16000);
+        }, 24000);
         if (!rows1Text || rows1Text.trim().length === 0) throw new Error("전반부 대본 생성 단계에서 API 응답이 비어있습니다.");
-        chatHistory.push({ role: "assistant", content: rows1Text });
 
         const rows1Result = parseJSON(rows1Text);
         if (!rows1Result?.rows) throw new Error("전반부 대본 JSON 파싱 실패\n응답: " + rows1Text.substring(0, 300));
 
-        // Step 2b: 후반부
+        // Step 2b: 후반부 (전반부 대본 텍스트만 요약해서 전달, 거대한 JSON 제외)
         setStreamText(prev => prev + '\n\n=== [3/4] 대본 후반부 생성 중 (core 후반 → solution → cta) ===\n\n');
         const rowsPrompt2 = buildRowsContinuePrompt(rows1Result.rows);
-        chatHistory.push({ role: "user", content: rowsPrompt2 });
-        const rows2Text = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
+        // 후반부도 경량 컨텍스트: 전반부 대본 텍스트만 포함
+        const part1ScriptOnly = rows1Result.rows.map(r => `[${r.section}] ${r.script}`).join('\n');
+        const rows2Messages = [
+          { role: "user", content: `전반부 대본 (section별 텍스트만):\n${part1ScriptOnly}` },
+          { role: "assistant", content: "네, 전반부 대본을 확인했습니다. 후반부 작성을 이어가겠습니다." },
+          { role: "user", content: rowsPrompt2 }
+        ];
+        const rows2Text = await runClaudeStream(rows2Messages, plan.model, null, (chunk) => {
           setStreamText(prev => prev + chunk);
-        }, 16000);
+        }, 24000);
         if (!rows2Text || rows2Text.trim().length === 0) throw new Error("후반부 대본 생성 단계에서 API 응답이 비어있습니다.");
-        chatHistory.push({ role: "assistant", content: rows2Text });
 
         const rows2Result = parseJSON(rows2Text);
         if (!rows2Result?.rows) throw new Error("후반부 대본 JSON 파싱 실패\n응답: " + rows2Text.substring(0, 300));
@@ -592,6 +601,10 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         const allRows = [...rows1Result.rows, ...rows2Result.rows];
         const fullScript = allRows.map(r => r.script).join('\n');
         rowsResult = { rows: allRows, full_script: fullScript };
+
+        // chatHistory에 합산 결과만 넣기 (제목 생성용)
+        chatHistory.push({ role: "user", content: rowsPrompt1 });
+        chatHistory.push({ role: "assistant", content: JSON.stringify({ rows: allRows.slice(0, 5).map(r => ({ section: r.section, script: r.script })), total_rows: allRows.length, full_script: fullScript }) });
 
       } else {
         // === 쇼츠: 한 번에 생성 ===
