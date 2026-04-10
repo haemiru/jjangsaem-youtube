@@ -56,15 +56,27 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
         searchFrom = endIdx + 1;
       }
       if (lastValid) return lastValid;
-      const rawStart = text.lastIndexOf('{');
-      if (rawStart !== -1) {
-        let depth = 0, endIdx = -1;
-        for (let i = rawStart; i < text.length; i++) {
-          if (text[i] === '{') depth++;
-          else if (text[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
+
+      // 잘린 JSON 복구 시도 — rows 배열이 도중에 끊긴 경우
+      const rootStart = cleaned.indexOf('{');
+      if (rootStart !== -1) {
+        let truncated = cleaned.substring(rootStart);
+        // 마지막 불완전한 object를 제거하고 배열/객체를 닫아서 복구 시도
+        const lastCompleteObj = truncated.lastIndexOf('}');
+        if (lastCompleteObj !== -1) {
+          let attempt = truncated.substring(0, lastCompleteObj + 1);
+          // 열린 brackets 수만큼 닫기
+          const openBrackets = (attempt.match(/\[/g) || []).length - (attempt.match(/\]/g) || []).length;
+          const openBraces = (attempt.match(/\{/g) || []).length - (attempt.match(/\}/g) || []).length;
+          attempt += ']'.repeat(Math.max(0, openBrackets)) + '}'.repeat(Math.max(0, openBraces));
+          try {
+            const recovered = JSON.parse(attempt);
+            console.warn(`JSON 복구 성공: rows ${recovered.rows?.length || 0}개 (잘린 응답에서 복구)`);
+            return recovered;
+          } catch {}
         }
-        if (endIdx !== -1) { try { return JSON.parse(text.substring(rawStart, endIdx + 1)); } catch {} }
       }
+
       return null;
     } catch { return null; }
   };
@@ -461,9 +473,11 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
       const rowsPrompt = buildRowsPrompt(hookResult);
 
       chatHistory.push({ role: "user", content: rowsPrompt });
+      // 롱폼 영상은 row가 170~220개로 출력이 매우 크므로 max_tokens를 늘림
+      const rowsMaxTokens = isShorts ? 16000 : 32000;
       const rowsResponseText = await runClaudeStream(chatHistory, plan.model, null, (chunk) => {
         setStreamText(prev => prev + chunk);
-      });
+      }, rowsMaxTokens);
       if (!rowsResponseText || rowsResponseText.trim().length === 0) throw new Error("본문 대본 생성 단계에서 API 응답이 비어있습니다.");
       chatHistory.push({ role: "assistant", content: rowsResponseText });
 
@@ -1036,7 +1050,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
 
 // --- API Helpers ---
 
-async function runClaudeStream(messages, model, _apiKey, onChunk) {
+async function runClaudeStream(messages, model, _apiKey, onChunk, maxTokens = 16000) {
   const systemPrompt = `당신은 키즈피지오 유튜브 채널의 콘텐츠 전문가입니다.
 
 [채널 컨셉]
@@ -1067,7 +1081,7 @@ async function runClaudeStream(messages, model, _apiKey, onChunk) {
     },
     body: JSON.stringify({
       model: model || "claude-haiku-4-5-20251001",
-      max_tokens: 16000,
+      max_tokens: maxTokens,
       stream: true,
       system: systemPrompt,
       messages: messages
