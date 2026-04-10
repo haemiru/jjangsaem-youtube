@@ -257,24 +257,25 @@ JSON으로 출력:
 JSON만 출력.`;
   };
 
-  const rowOutputRules = `[출력 규칙]
-1. 대본을 짧게 끊어서 rows 배열에 넣어줘.
-   - 한 row 당 한 호흡(약 15~30자, 길어도 1문장) 단위로 잘라야 함. 절대 2문장을 한 row에 넣지 말 것.
-   - 한 문장이 길면 쉼표/접속사 단위로 잘라 여러 row로 분할해도 됨 (예: "많은 부모님들이 / 괜찮다고 생각하지만 / 사실은 그렇지 않습니다" → 3 row).
-   - 이렇게 잘게 자르는 이유: row 1개당 이미지가 1장이라, 잘게 자를수록 화면 전환이 빨라져서 시청자가 덜 지루해짐.
-2. 각 row에 section 필드를 반드시 포함 — 값은 ${isShorts ? '"hook", "explain", "core", "cta"' : '"hook", "empathy", "twist", "core", "solution", "cta"'} 중 하나
-3. 각 row의 image_prompt: Write in ENGLISH. A prompt to visualize the sentence as an image.
+  const imagePromptRules = `각 row의 image_prompt: Write in ENGLISH. A prompt to visualize the sentence as an image.
    - Must include "white background"
    - Character appears with pose/expression explaining the content
    - Include ONLY 1~2 SHORT Korean keyword text (한글 키워드, max 4 words) inside a speech bubble or label near the character. Text must be in Korean (한글), NEVER English.
    - CRITICAL: Do NOT include any other text, titles, headlines, captions, or sentences in the image. Only the specified Korean keyword should be visible.
    - Focus on character pose, expression, simple props/icons
    - Do NOT place any text in the bottom 20% of the frame (reserved for video subtitles). Characters and props can use the full frame freely.
-4. 각 row의 video_prompt: Write in ENGLISH. A prompt to animate the image into a 5-second video.
+각 row의 video_prompt: Write in ENGLISH. A prompt to animate the image into a 5-second video.
    - Include camera movement, character animation, visual effects, etc.
    - Do NOT mention any text animation (text is added in post-production)
+⚠️ 중요: image_prompt와 video_prompt 값은 반드시 영어로 작성. 단, 이미지에 포함할 한글 키워드는 한글 그대로 프롬프트에 포함할 것. 영어 텍스트 절대 금지.`;
 
-⚠️ 중요: image_prompt와 video_prompt 값은 반드시 영어로 작성. 단, 이미지에 포함할 한글 키워드는 한글 그대로 프롬프트에 포함할 것. 영어 텍스트 절대 금지.
+  const shortsRowOutputRules = `[출력 규칙]
+1. 대본을 짧게 끊어서 rows 배열에 넣어줘.
+   - 한 row 당 한 호흡(약 15~30자, 길어도 1문장) 단위로 잘라야 함. 절대 2문장을 한 row에 넣지 말 것.
+   - 한 문장이 길면 쉼표/접속사 단위로 잘라 여러 row로 분할해도 됨.
+   - 이렇게 잘게 자르는 이유: row 1개당 이미지가 1장이라, 잘게 자를수록 화면 전환이 빨라져서 시청자가 덜 지루해짐.
+2. 각 row에 section 필드를 반드시 포함 — 값은 "hook", "explain", "core", "cta" 중 하나
+3. ${imagePromptRules}
 
 JSON 출력:
 {
@@ -282,8 +283,8 @@ JSON 출력:
     {
       "section": "hook",
       "script": "대본 문장 (한국어)",
-      "image_prompt": "White background, cartoon character standing with surprised expression, small question mark icon floating above head, minimalist design, Korean text '위험 신호' inside a speech bubble near character's head, no other text or headlines, no English text",
-      "video_prompt": "Camera slowly zooms into character, question mark icon bounces, character's eyes widen"
+      "image_prompt": "White background, cartoon character with surprised expression, Korean text '위험 신호' in speech bubble, no other text",
+      "video_prompt": "Camera slowly zooms into character, question mark bounces"
     }
   ]
 }
@@ -295,13 +296,12 @@ JSON만 출력.`;
 - 모든 이미지는 흰색 배경 위에 캐릭터와 간단한 텍스트/아이콘으로 구성됩니다.
 - Nick Invests 채널처럼 깔끔하고 미니멀한 교육 콘텐츠 스타일입니다.`;
 
-  // 롱폼은 2회에 나눠서 생성 (전반부/후반부)
+  // 롱폼은 대본 텍스트 먼저 완성 → 이미지/영상 프롬프트 별도 생성
   const needsSplit = !isShorts;
 
-  const buildRowsPrompt = (hookResult) => {
-    if (needsSplit) {
-      // 롱폼 전반부: hook ~ core 중간까지
-      return `위에서 기획한 요소를 이어받아, 대본의 전반부를 작성해줘.
+  // === 롱폼 전용: 대본 텍스트만 생성하는 프롬프트 ===
+  const buildScriptOnlyPrompt = (hookResult) => {
+    return `위에서 기획한 요소를 이어받아, 전체 대본 텍스트를 작성해줘.
 
 [기획된 요소]
 훅: ${hookResult.final_hook.text}
@@ -309,28 +309,73 @@ JSON만 출력.`;
 반전: ${hookResult.twist}
 
 포맷: ${plan.format}
-연계 전자책: ${plan.ebookName}
+연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
 ${buildPrevVideosContext()}
 ${structureGuide}
 
-[분량 기준 — 전반부]
-- 전체 목표 영상 길이: ${lengthGuide.time}
-- 전체 row 수: ${lengthGuide.rows}개
-- 이번에는 전반부(hook → empathy → twist → core 전반)만 작성
-- 전체의 약 55~60% 분량을 이번에 작성 (row 수 기준)
-- core 섹션은 핵심 설명의 전반부까지만 작성하고, 자연스럽게 이어질 수 있는 지점에서 끊어줘
-- 마지막 row의 다음에 이어서 쓸 수 있도록 내용을 마무리하지 말 것
+${pickCtaGuide()}
 
-${styleGuide}
+[분량 기준 — 매우 중요! 반드시 지켜야 합니다]
+- 목표 영상 길이: ${lengthGuide.time}
+- row 수: ${lengthGuide.rows}개
+- 전체 대본 총 글자 수: ${lengthGuide.chars}자
+- 한국어 나레이션 기준 약 300자 = 1분입니다. 이 기준에 맞춰 분량을 조절하세요.
+- 반드시 총 글자 수 기준을 지켜주세요. 목표 글자 수보다 적게 쓰면 안 됩니다.
 
 [알고리즘 핵심 전략]
 - 첫 3초 = 공포 or 궁금증
 - 중간 = 반전 (행동 → 뇌)
+- 끝 = 저장/공유 유도
 
-${rowOutputRules}`;
+[출력 규칙]
+1. 대본을 짧게 끊어서 rows 배열에 넣어줘 (총 ${lengthGuide.rows}개 row).
+   - 한 row 당 한 호흡(약 15~30자, 길어도 1문장) 단위로 잘라야 함. 절대 2문장을 한 row에 넣지 말 것.
+   - 한 문장이 길면 쉼표/접속사 단위로 잘라 여러 row로 분할해도 됨.
+2. 각 row에 section 필드를 반드시 포함 — 값은 "hook", "empathy", "twist", "core", "solution", "cta" 중 하나
+3. 이 단계에서는 script와 section만 출력 (image_prompt, video_prompt는 다음 단계에서 별도 생성)
+
+⚠️ 반드시 hook부터 cta까지 모든 섹션을 포함할 것. cta와 마무리 인사가 빠지면 안 됩니다.
+
+JSON 출력:
+{
+  "rows": [
+    { "section": "hook", "script": "대본 문장" },
+    { "section": "empathy", "script": "공감 문장" }
+  ],
+  "full_script": "전체 대본을 이어붙인 텍스트 (복사용)"
+}
+JSON만 출력.`;
+  };
+
+  // === 롱폼 전용: 대본에 이미지/영상 프롬프트를 추가하는 프롬프트 ===
+  const buildVisualPromptsPrompt = (rows, startIdx, endIdx) => {
+    const subset = rows.slice(startIdx, endIdx);
+    const rowsList = subset.map((r, i) => `${startIdx + i + 1}. [${r.section}] ${r.script}`).join('\n');
+
+    return `아래 대본의 각 row에 대해 image_prompt와 video_prompt를 생성해줘.
+
+${styleGuide}
+
+[대본 rows ${startIdx + 1}~${endIdx}]
+${rowsList}
+
+[출력 규칙]
+${imagePromptRules}
+
+JSON 출력 — 위 대본 순서 그대로, prompts 배열에 넣어줘:
+{
+  "prompts": [
+    {
+      "image_prompt": "White background, cartoon character with surprised expression, Korean text '위험 신호' in speech bubble, no other text",
+      "video_prompt": "Camera slowly zooms into character, question mark bounces"
     }
+  ]
+}
+JSON만 출력. prompts 배열의 개수는 반드시 ${subset.length}개여야 합니다.`;
+  };
 
-    // 쇼츠: 한 번에 전체 생성
+  // === 쇼츠 전용 ===
+  const buildRowsPrompt = (hookResult) => {
     return `위에서 기획한 요소를 이어받아, 전체 대본을 작성해줘.
 
 [기획된 요소]
@@ -356,43 +401,7 @@ ${styleGuide}
 - 중간 = 반전 (행동 → 뇌)
 - 끝 = 저장/공유 유도
 
-${rowOutputRules}`;
-  };
-
-  const buildRowsContinuePrompt = (firstHalfRows) => {
-    const lastScript = firstHalfRows.slice(-3).map(r => r.script).join(' / ');
-    const firstHalfCount = firstHalfRows.length;
-    const ctaGuide = pickCtaGuide();
-
-    return `위 전반부 대본에 이어서 후반부를 작성해줘.
-
-[현재까지 작성된 분량]
-- 전반부 row 수: ${firstHalfCount}개
-- 전반부 마지막 내용: "${lastScript}"
-
-[후반부에 작성할 내용]
-- core 섹션의 나머지 부분
-- solution 섹션 (BEFORE→AFTER, 바로 따라할 수 있는 실용 솔루션)
-- cta 섹션
-
-포맷: ${plan.format}
-연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
-
-${ctaGuide}
-
-[분량 기준 — 후반부]
-- 전체 목표 row 수: ${lengthGuide.rows}개
-- 전반부에서 ${firstHalfCount}개 작성했으므로 나머지를 채워줘
-- 전체 대본 총 글자 수: ${lengthGuide.chars}자 (전반부와 합산하여 이 범위에 맞춰야 함)
-- 반드시 solution과 cta 섹션을 포함할 것
-- 대본의 맨 마지막 row는 반드시 마무리 인사로 끝낼 것
-
-${styleGuide}
-
-[알고리즘 핵심 전략]
-- 끝 = 저장/공유 유도
-
-${rowOutputRules}`;
+${shortsRowOutputRules}`;
   };
 
   const buildTitlePrompt = (rowsResult) => {
@@ -476,23 +485,30 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
       setManualStep(2);
       setManualInput('');
     } else if (manualStep === 2 && needsSplit) {
-      // 롱폼 전반부 rows
+      // 롱폼: 대본 텍스트 (section + script only)
       if (!parsed.rows) { setManualError('rows 필드가 없습니다.'); return; }
-      setManualRowsPart1(parsed);
+      setManualRowsPart1(parsed); // 대본 텍스트 저장
       setManualStep(3);
       setManualInput('');
-    } else if ((manualStep === 2 && !needsSplit) || (manualStep === 3 && needsSplit)) {
-      // 쇼츠 전체 rows / 롱폼 후반부 rows
+    } else if (manualStep === 2 && !needsSplit) {
+      // 쇼츠: 전체 rows (script + image/video prompt)
       if (!parsed.rows) { setManualError('rows 필드가 없습니다.'); return; }
-      if (needsSplit) {
-        // 전반부 + 후반부 합치기
-        const allRows = [...(manualRowsPart1?.rows || []), ...parsed.rows];
-        const fullScript = allRows.map(r => r.script).join('\n');
-        setManualRowsResult({ rows: allRows, full_script: fullScript });
-      } else {
-        setManualRowsResult(parsed);
-      }
-      setManualStep(needsSplit ? 4 : 3);
+      setManualRowsResult(parsed);
+      setManualStep(3);
+      setManualInput('');
+    } else if (manualStep === 3 && needsSplit) {
+      // 롱폼: 이미지/영상 프롬프트 (prompts 배열)
+      if (!parsed.prompts) { setManualError('prompts 필드가 없습니다.'); return; }
+      // 대본 텍스트 + 프롬프트 합치기
+      const scriptRows = manualRowsPart1?.rows || [];
+      const mergedRows = scriptRows.map((row, i) => ({
+        ...row,
+        image_prompt: parsed.prompts[i]?.image_prompt || '',
+        video_prompt: parsed.prompts[i]?.video_prompt || ''
+      }));
+      const fullScript = scriptRows.map(r => r.script).join('\n');
+      setManualRowsResult({ rows: mergedRows, full_script: fullScript });
+      setManualStep(4);
       setManualInput('');
     } else if ((manualStep === 3 && !needsSplit) || (manualStep === 4 && needsSplit)) {
       // Title result — save everything
@@ -522,14 +538,18 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
 
   const getManualPrompt = () => {
     if (manualStep === 1) return buildHookPrompt();
-    if (manualStep === 2) return buildRowsPrompt(manualHookResult);
-    if (manualStep === 3 && needsSplit) return buildRowsContinuePrompt(manualRowsPart1?.rows || []);
+    if (manualStep === 2 && needsSplit) return buildScriptOnlyPrompt(manualHookResult);
+    if (manualStep === 2 && !needsSplit) return buildRowsPrompt(manualHookResult);
+    if (manualStep === 3 && needsSplit) {
+      const rows = manualRowsPart1?.rows || [];
+      return buildVisualPromptsPrompt(rows, 0, rows.length);
+    }
     if ((manualStep === 3 && !needsSplit) || (manualStep === 4 && needsSplit)) return buildTitlePrompt(manualRowsResult);
     return '';
   };
 
   const manualStepLabels = needsSplit
-    ? ['', '1/4: 훅(Hook) 기획', '2/4: 대본 전반부', '3/4: 대본 후반부', '4/4: 제목 및 썸네일']
+    ? ['', '1/4: 훅(Hook) 기획', '2/4: 대본 텍스트', '3/4: 이미지/영상 프롬프트', '4/4: 제목 및 썸네일']
     : ['', '1/3: 훅(Hook) 기획', '2/3: 대본 본문 생성', '3/3: 제목 및 썸네일'];
 
   const generateAll = async () => {
@@ -561,50 +581,61 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
       setCurrentStep(2);
 
       if (needsSplit) {
-        // === 롱폼: 2회 분할 생성 (컨텍스트 경량화) ===
-        // Step 2a: 전반부
-        setStreamText(prev => prev + '\n\n=== [2/4] 대본 전반부 생성 중 (hook → core 전반) ===\n\n');
-        const rowsPrompt1 = buildRowsPrompt(hookResult);
-        // 전반부는 독립 호출 (hook 결과만 컨텍스트로 전달)
-        const rows1Messages = [
+        // === 롱폼: 대본 텍스트 먼저 완성 → 이미지/영상 프롬프트 별도 생성 ===
+
+        // Step 2: 전체 대본 텍스트 생성 (section + script만, 출력 매우 작음)
+        setStreamText(prev => prev + '\n\n=== [2/4] 전체 대본 텍스트 생성 중 ===\n\n');
+        const scriptPrompt = buildScriptOnlyPrompt(hookResult);
+        const scriptMessages = [
           { role: "user", content: `훅 기획 결과:\n${JSON.stringify({ final_hook: hookResult.final_hook, empathy: hookResult.empathy, twist: hookResult.twist })}` },
           { role: "assistant", content: "네, 훅 기획 결과를 확인했습니다. 대본 작성을 시작하겠습니다." },
-          { role: "user", content: rowsPrompt1 }
+          { role: "user", content: scriptPrompt }
         ];
-        const rows1Text = await runClaudeStream(rows1Messages, plan.model, null, (chunk) => {
+        const scriptText = await runClaudeStream(scriptMessages, plan.model, null, (chunk) => {
           setStreamText(prev => prev + chunk);
-        }, 24000);
-        if (!rows1Text || rows1Text.trim().length === 0) throw new Error("전반부 대본 생성 단계에서 API 응답이 비어있습니다.");
+        }, 16000);
+        if (!scriptText || scriptText.trim().length === 0) throw new Error("대본 텍스트 생성 단계에서 API 응답이 비어있습니다.");
 
-        const rows1Result = parseJSON(rows1Text);
-        if (!rows1Result?.rows) throw new Error("전반부 대본 JSON 파싱 실패\n응답: " + rows1Text.substring(0, 300));
+        const scriptResult = parseJSON(scriptText);
+        if (!scriptResult?.rows) throw new Error("대본 텍스트 JSON 파싱 실패\n응답: " + scriptText.substring(0, 300));
 
-        // Step 2b: 후반부 (전반부 대본 텍스트만 요약해서 전달, 거대한 JSON 제외)
-        setStreamText(prev => prev + '\n\n=== [3/4] 대본 후반부 생성 중 (core 후반 → solution → cta) ===\n\n');
-        const rowsPrompt2 = buildRowsContinuePrompt(rows1Result.rows);
-        // 후반부도 경량 컨텍스트: 전반부 대본 텍스트만 포함
-        const part1ScriptOnly = rows1Result.rows.map(r => `[${r.section}] ${r.script}`).join('\n');
-        const rows2Messages = [
-          { role: "user", content: `전반부 대본 (section별 텍스트만):\n${part1ScriptOnly}` },
-          { role: "assistant", content: "네, 전반부 대본을 확인했습니다. 후반부 작성을 이어가겠습니다." },
-          { role: "user", content: rowsPrompt2 }
-        ];
-        const rows2Text = await runClaudeStream(rows2Messages, plan.model, null, (chunk) => {
-          setStreamText(prev => prev + chunk);
-        }, 24000);
-        if (!rows2Text || rows2Text.trim().length === 0) throw new Error("후반부 대본 생성 단계에서 API 응답이 비어있습니다.");
+        const scriptRows = scriptResult.rows;
+        const fullScript = scriptResult.full_script || scriptRows.map(r => r.script).join('\n');
 
-        const rows2Result = parseJSON(rows2Text);
-        if (!rows2Result?.rows) throw new Error("후반부 대본 JSON 파싱 실패\n응답: " + rows2Text.substring(0, 300));
+        // Step 3: 이미지/영상 프롬프트 생성 (2배치로 분할)
+        setStreamText(prev => prev + `\n\n=== [3/4] 이미지/영상 프롬프트 생성 중 (${scriptRows.length}개 row) ===\n\n`);
+        const mid = Math.ceil(scriptRows.length / 2);
 
-        // 전반부 + 후반부 합치기
-        const allRows = [...rows1Result.rows, ...rows2Result.rows];
-        const fullScript = allRows.map(r => r.script).join('\n');
-        rowsResult = { rows: allRows, full_script: fullScript };
+        // 배치 1: 전반부 rows
+        const vp1Prompt = buildVisualPromptsPrompt(scriptRows, 0, mid);
+        const vp1Text = await runClaudeStream(
+          [{ role: "user", content: vp1Prompt }],
+          plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 16000
+        );
+        const vp1Result = parseJSON(vp1Text);
 
-        // chatHistory에 합산 결과만 넣기 (제목 생성용)
-        chatHistory.push({ role: "user", content: rowsPrompt1 });
-        chatHistory.push({ role: "assistant", content: JSON.stringify({ rows: allRows.slice(0, 5).map(r => ({ section: r.section, script: r.script })), total_rows: allRows.length, full_script: fullScript }) });
+        // 배치 2: 후반부 rows
+        setStreamText(prev => prev + '\n\n--- 후반부 프롬프트 생성 중 ---\n\n');
+        const vp2Prompt = buildVisualPromptsPrompt(scriptRows, mid, scriptRows.length);
+        const vp2Text = await runClaudeStream(
+          [{ role: "user", content: vp2Prompt }],
+          plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 16000
+        );
+        const vp2Result = parseJSON(vp2Text);
+
+        // 대본 + 프롬프트 합치기
+        const allPrompts = [...(vp1Result?.prompts || []), ...(vp2Result?.prompts || [])];
+        const mergedRows = scriptRows.map((row, i) => ({
+          ...row,
+          image_prompt: allPrompts[i]?.image_prompt || '',
+          video_prompt: allPrompts[i]?.video_prompt || ''
+        }));
+
+        rowsResult = { rows: mergedRows, full_script: fullScript };
+
+        // chatHistory에 요약만 넣기 (제목 생성용)
+        chatHistory.push({ role: "user", content: scriptPrompt });
+        chatHistory.push({ role: "assistant", content: JSON.stringify({ rows: mergedRows.slice(0, 5).map(r => ({ section: r.section, script: r.script })), total_rows: mergedRows.length, full_script: fullScript }) });
 
       } else {
         // === 쇼츠: 한 번에 생성 ===
