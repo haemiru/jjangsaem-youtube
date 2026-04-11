@@ -92,12 +92,12 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
   // row 수를 약 1.5~2배로 늘려 이미지가 더 자주 바뀌도록 (시청자 지루함 방지)
   const lengthGuide = (() => {
     const f = plan.format;
-    if (f === '쇼츠 15~30초') return { rows: '14~22', chars: '300~500', time: '15~30초' };
-    if (f === '쇼츠 60초') return { rows: '28~44', chars: '700~1000', time: '50~60초' };
-    if (f === '일반 4~5분') return { rows: '100~130', chars: '3000~4000', time: '4~5분' };
-    if (f === '일반 8~10분') return { rows: '170~220', chars: '6000~8000', time: '8~10분' };
-    if (f === '일반 10분 이상') return { rows: '230~290', chars: '8000~11000', time: '10분 이상' };
-    return { rows: '100~160', chars: '4000~6000', time: '5~10분' };
+    if (f === '쇼츠 15~30초') return { rows: '14~22', minRows: 14, chars: '300~500', minChars: 300, time: '15~30초' };
+    if (f === '쇼츠 60초') return { rows: '28~44', minRows: 28, chars: '700~1000', minChars: 700, time: '50~60초' };
+    if (f === '일반 4~5분') return { rows: '100~130', minRows: 100, chars: '3000~4000', minChars: 3000, time: '4~5분' };
+    if (f === '일반 8~10분') return { rows: '170~220', minRows: 170, chars: '6000~8000', minChars: 6000, time: '8~10분' };
+    if (f === '일반 10분 이상') return { rows: '230~290', minRows: 230, chars: '8000~11000', minChars: 8000, time: '10분 이상' };
+    return { rows: '100~160', minRows: 100, chars: '4000~6000', minChars: 4000, time: '5~10분' };
   })();
 
   // CTA 다양화 — 매 생성마다 랜덤 스타일 1~2개 선택, 일정 확률로 구독/좋아요 멘트 포함
@@ -300,7 +300,52 @@ JSON만 출력.`;
   const needsSplit = !isShorts;
 
   // === 롱폼 전용: 대본 텍스트만 생성하는 프롬프트 ===
-  const buildScriptOnlyPrompt = (hookResult) => {
+  const buildScriptOnlyPrompt = (hookResult, continueFrom = null) => {
+    if (continueFrom) {
+      // 이어쓰기 모드: 부족한 분량을 채우기 위한 후속 호출
+      const existingScripts = continueFrom.rows.map(r => `[${r.section}] ${r.script}`).join('\n');
+      const existingSections = [...new Set(continueFrom.rows.map(r => r.section))];
+      const missingSections = ['hook', 'empathy', 'twist', 'core', 'solution', 'cta'].filter(s => !existingSections.includes(s));
+      const existingChars = continueFrom.rows.reduce((sum, r) => sum + r.script.length, 0);
+      const remainingChars = lengthGuide.minChars - existingChars;
+      const remainingRows = lengthGuide.minRows - continueFrom.rows.length;
+
+      return `아래는 지금까지 작성된 대본입니다. 분량이 부족하므로 이어서 작성해주세요.
+
+[현재까지 작성된 대본 — ${continueFrom.rows.length}개 row, ${existingChars}자]
+${existingScripts}
+
+[부족한 분량]
+- 현재: ${continueFrom.rows.length}개 row / ${existingChars}자
+- 목표: 최소 ${lengthGuide.minRows}개 row / ${lengthGuide.minChars}자
+- 추가 필요: 최소 ${remainingRows}개 row / ${remainingChars}자 이상
+${missingSections.length > 0 ? `- 빠진 섹션: ${missingSections.join(', ')} ← 반드시 포함할 것!` : ''}
+
+[이어쓰기 규칙]
+- 위 대본의 마지막 row에 자연스럽게 이어지도록 작성
+- ${missingSections.includes('cta') ? '반드시 cta 섹션과 마무리 인사를 포함할 것!' : ''}
+- 기존 내용을 반복하지 말 것 — 새로운 설명, 예시, 솔루션을 추가
+- 각 섹션의 내용을 더 풍부하게 확장 (구체적인 예시, 비유, 실천 방법 추가)
+
+포맷: ${plan.format}
+연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
+
+${missingSections.includes('cta') ? pickCtaGuide() : ''}
+
+[출력 규칙]
+- 한 row 당 한 호흡(약 15~30자) 단위
+- section 값: "hook", "empathy", "twist", "core", "solution", "cta" 중 하나
+- script와 section만 출력
+
+JSON 출력:
+{
+  "rows": [
+    { "section": "core", "script": "이어지는 대본 문장" }
+  ]
+}
+JSON만 출력.`;
+    }
+
     return `위에서 기획한 요소를 이어받아, 전체 대본 텍스트를 작성해줘.
 
 [기획된 요소]
@@ -315,12 +360,17 @@ ${structureGuide}
 
 ${pickCtaGuide()}
 
-[분량 기준 — 매우 중요! 반드시 지켜야 합니다]
+[⚠️⚠️⚠️ 분량 기준 — 가장 중요! 이 기준을 어기면 영상을 만들 수 없습니다 ⚠️⚠️⚠️]
 - 목표 영상 길이: ${lengthGuide.time}
-- row 수: ${lengthGuide.rows}개
-- 전체 대본 총 글자 수: ${lengthGuide.chars}자
-- 한국어 나레이션 기준 약 300자 = 1분입니다. 이 기준에 맞춰 분량을 조절하세요.
-- 반드시 총 글자 수 기준을 지켜주세요. 목표 글자 수보다 적게 쓰면 안 됩니다.
+- 최소 row 수: ${lengthGuide.minRows}개 이상 (목표: ${lengthGuide.rows}개)
+- 최소 대본 글자 수: ${lengthGuide.minChars}자 이상 (목표: ${lengthGuide.chars}자)
+- 한국어 나레이션 기준 약 300자 = 1분입니다.
+- ${lengthGuide.time} 영상이려면 최소 ${lengthGuide.minChars}자가 필요합니다.
+- 70~80개 row로 끝내면 안 됩니다! 반드시 ${lengthGuide.minRows}개 이상 작성하세요.
+- 각 섹션을 충분히 풍부하게 작성하세요:
+  · core 섹션: 핵심 개념을 여러 비유와 예시로 깊이 있게 설명 (전체의 35%)
+  · solution 섹션: 구체적인 실천 방법을 BEFORE/AFTER와 함께 상세히 (전체의 25%)
+  · cta 섹션: 마무리 + CTA + 인사 (전체의 5~10%)
 
 [알고리즘 핵심 전략]
 - 첫 3초 = 공포 or 궁금증
@@ -328,13 +378,15 @@ ${pickCtaGuide()}
 - 끝 = 저장/공유 유도
 
 [출력 규칙]
-1. 대본을 짧게 끊어서 rows 배열에 넣어줘 (총 ${lengthGuide.rows}개 row).
+1. 대본을 짧게 끊어서 rows 배열에 넣어줘 (최소 ${lengthGuide.minRows}개 row 이상).
    - 한 row 당 한 호흡(약 15~30자, 길어도 1문장) 단위로 잘라야 함. 절대 2문장을 한 row에 넣지 말 것.
    - 한 문장이 길면 쉼표/접속사 단위로 잘라 여러 row로 분할해도 됨.
 2. 각 row에 section 필드를 반드시 포함 — 값은 "hook", "empathy", "twist", "core", "solution", "cta" 중 하나
 3. 이 단계에서는 script와 section만 출력 (image_prompt, video_prompt는 다음 단계에서 별도 생성)
 
-⚠️ 반드시 hook부터 cta까지 모든 섹션을 포함할 것. cta와 마무리 인사가 빠지면 안 됩니다.
+⚠️ 반드시 hook부터 cta까지 6개 섹션을 모두 포함할 것.
+⚠️ cta와 마무리 인사가 빠지면 절대 안 됩니다.
+⚠️ ${lengthGuide.minRows}개 row 미만이면 영상을 만들 수 없으므로, 내용을 더 풍부하게 작성하세요.
 
 JSON 출력:
 {
@@ -596,11 +648,28 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         }, 16000);
         if (!scriptText || scriptText.trim().length === 0) throw new Error("대본 텍스트 생성 단계에서 API 응답이 비어있습니다.");
 
-        const scriptResult = parseJSON(scriptText);
+        let scriptResult = parseJSON(scriptText);
         if (!scriptResult?.rows) throw new Error("대본 텍스트 JSON 파싱 실패\n응답: " + scriptText.substring(0, 300));
 
-        const scriptRows = scriptResult.rows;
-        const fullScript = scriptResult.full_script || scriptRows.map(r => r.script).join('\n');
+        // row 수 부족 시 이어쓰기 (최대 2회 추가 시도)
+        let scriptRows = scriptResult.rows;
+        const hasCta = scriptRows.some(r => r.section === 'cta');
+        for (let attempt = 0; attempt < 2 && (scriptRows.length < lengthGuide.minRows || !scriptRows.some(r => r.section === 'cta')); attempt++) {
+          setStreamText(prev => prev + `\n\n--- 분량 부족 (${scriptRows.length}/${lengthGuide.minRows}개), 이어쓰기 ${attempt + 1}회 ---\n\n`);
+          const continuePrompt = buildScriptOnlyPrompt(hookResult, { rows: scriptRows });
+          const contText = await runClaudeStream(
+            [{ role: "user", content: continuePrompt }],
+            plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 16000
+          );
+          const contResult = parseJSON(contText);
+          if (contResult?.rows) {
+            scriptRows = [...scriptRows, ...contResult.rows];
+          } else {
+            break;
+          }
+        }
+
+        const fullScript = scriptRows.map(r => r.script).join('\n');
 
         // Step 3: 이미지/영상 프롬프트 생성 (2배치로 분할)
         setStreamText(prev => prev + `\n\n=== [3/4] 이미지/영상 프롬프트 생성 중 (${scriptRows.length}개 row) ===\n\n`);
