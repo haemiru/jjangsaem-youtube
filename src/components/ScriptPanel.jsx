@@ -405,7 +405,62 @@ JSON 출력 — 위 대본 순서 그대로, prompts 배열에 넣어줘:
 JSON만 출력. prompts 배열의 개수는 반드시 ${subset.length}개여야 합니다.`;
   };
 
-  // === 쇼츠 전용 ===
+  // === 수동 모드 롱폼용: script + image/video prompt 한 번에 생성 (claude.ai에서 사용) ===
+  const buildManualRowsPrompt = (hookResult) => {
+    return `위에서 기획한 요소를 이어받아, 전체 대본을 작성해줘.
+
+[기획된 요소]
+훅: ${hookResult.final_hook.text}
+공감: ${hookResult.empathy}
+반전: ${hookResult.twist}
+
+포맷: ${plan.format}
+연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
+${buildPrevVideosContext()}
+${structureGuide}
+
+${pickCtaGuide()}
+
+[분량 기준 — 매우 중요! 반드시 지켜야 합니다]
+- 목표 영상 길이: ${lengthGuide.time}
+- row 수: ${lengthGuide.rows}개
+- 전체 대본 총 글자 수: ${lengthGuide.chars}자
+- 한국어 나레이션 기준 약 300자 = 1분입니다. 이 기준에 맞춰 분량을 조절하세요.
+- 반드시 총 글자 수 기준을 지켜주세요. 목표 글자 수보다 적게 쓰면 안 됩니다.
+
+${styleGuide}
+
+[알고리즘 핵심 전략]
+- 첫 3초 = 공포 or 궁금증
+- 중간 = 반전 (행동 → 뇌)
+- 끝 = 저장/공유 유도
+
+[출력 규칙]
+1. 대본을 짧게 끊어서 rows 배열에 넣어줘 (총 ${lengthGuide.rows}개 row).
+   - 한 row 당 한 호흡(약 15~30자, 길어도 1문장) 단위로 잘라야 함. 절대 2문장을 한 row에 넣지 말 것.
+   - 한 문장이 길면 쉼표/접속사 단위로 잘라 여러 row로 분할해도 됨.
+   - 이렇게 잘게 자르는 이유: row 1개당 이미지가 1장이라, 잘게 자를수록 화면 전환이 빨라져서 시청자가 덜 지루해짐.
+2. 각 row에 section 필드를 반드시 포함 — 값은 "hook", "empathy", "twist", "core", "solution", "cta" 중 하나
+3. ${imagePromptRules}
+
+⚠️ 반드시 hook부터 cta까지 6개 섹션을 모두 포함할 것.
+
+JSON 출력:
+{
+  "rows": [
+    {
+      "section": "hook",
+      "script": "대본 문장 (한국어)",
+      "image_prompt": "White background, cartoon character with surprised expression, Korean text '위험 신호' in speech bubble, no other text",
+      "video_prompt": "Camera slowly zooms into character, question mark bounces"
+    }
+  ],
+  "full_script": "전체 대본을 이어붙인 텍스트 (복사용)"
+}
+JSON만 출력.`;
+  };
+
+  // === 쇼츠용 ===
   const buildRowsPrompt = (hookResult) => {
     return `위에서 기획한 요소를 이어받아, 전체 대본을 작성해줘.
 
@@ -499,60 +554,28 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
   };
 
   // === Manual mode: parse & save results ===
-  const manualTotalSteps = needsSplit ? 5 : 3;
+  // 수동 모드는 항상 3단계 (claude.ai에서 직접 실행하므로 토큰 제한 없음)
+  const manualTotalSteps = 3;
 
   const handleManualSubmit = () => {
     setManualError('');
+    const parsed = parseJSON(manualInput);
+    if (!parsed) {
+      setManualError('JSON 파싱 실패. Claude의 응답에서 JSON 부분만 복사해서 붙여넣어 주세요.');
+      return;
+    }
 
     if (manualStep === 1) {
-      // Hook result (JSON)
-      const parsed = parseJSON(manualInput);
-      if (!parsed) { setManualError('JSON 파싱 실패.'); return; }
       if (!parsed.final_hook) { setManualError('final_hook 필드가 없습니다.'); return; }
       setManualHookResult(parsed);
       setManualStep(2);
       setManualInput('');
-    } else if (manualStep === 2 && needsSplit) {
-      // 롱폼: 산문 대본 (일반 텍스트)
-      if (!manualInput.includes('===SECTION:')) { setManualError('===SECTION:xxx=== 구분자가 없습니다. 산문 형식 그대로 붙여넣어 주세요.'); return; }
-      setManualProseText(manualInput);
-      setManualStep(3);
-      setManualInput('');
-    } else if (manualStep === 2 && !needsSplit) {
-      // 쇼츠: 전체 rows (JSON)
-      const parsed = parseJSON(manualInput);
-      if (!parsed) { setManualError('JSON 파싱 실패.'); return; }
+    } else if (manualStep === 2) {
       if (!parsed.rows) { setManualError('rows 필드가 없습니다.'); return; }
       setManualRowsResult(parsed);
       setManualStep(3);
       setManualInput('');
-    } else if (manualStep === 3 && needsSplit) {
-      // 롱폼: row 분할 결과 (JSON)
-      const parsed = parseJSON(manualInput);
-      if (!parsed) { setManualError('JSON 파싱 실패.'); return; }
-      if (!parsed.rows) { setManualError('rows 필드가 없습니다.'); return; }
-      setManualRowsPart1(parsed);
-      setManualStep(4);
-      setManualInput('');
-    } else if (manualStep === 4 && needsSplit) {
-      // 롱폼: 이미지/영상 프롬프트 (JSON)
-      const parsed = parseJSON(manualInput);
-      if (!parsed) { setManualError('JSON 파싱 실패.'); return; }
-      if (!parsed.prompts) { setManualError('prompts 필드가 없습니다.'); return; }
-      const scriptRows = manualRowsPart1?.rows || [];
-      const mergedRows = scriptRows.map((row, i) => ({
-        ...row,
-        image_prompt: parsed.prompts[i]?.image_prompt || '',
-        video_prompt: parsed.prompts[i]?.video_prompt || ''
-      }));
-      const fullScript = scriptRows.map(r => r.script).join('\n');
-      setManualRowsResult({ rows: mergedRows, full_script: fullScript });
-      setManualStep(5);
-      setManualInput('');
-    } else if ((manualStep === 3 && !needsSplit) || (manualStep === 5 && needsSplit)) {
-      // Title result (JSON)
-      const parsed = parseJSON(manualInput);
-      if (!parsed) { setManualError('JSON 파싱 실패.'); return; }
+    } else if (manualStep === 3) {
       const fullScript = manualRowsResult.full_script || manualRowsResult.rows?.map(r => r.script).join('\n') || '';
       const finalState = {
         ...globalScript,
@@ -572,27 +595,19 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
       updateState('script', finalState);
       updateState('metadata', { ...globalState.metadata, title: parsed.final_title, description: fullScript.substring(0, 200) });
       updateState('media', { ...globalState.media, selectedThumbnailCopy: parsed.final_thumbnail_copy });
-      setManualStep(manualTotalSteps + 1);
+      setManualStep(4);
       setManualInput('');
     }
   };
 
   const getManualPrompt = () => {
     if (manualStep === 1) return buildHookPrompt();
-    if (manualStep === 2 && needsSplit) return buildProsePrompt(manualHookResult);
-    if (manualStep === 2 && !needsSplit) return buildRowsPrompt(manualHookResult);
-    if (manualStep === 3 && needsSplit) return buildSplitRowsPrompt(manualProseText);
-    if (manualStep === 4 && needsSplit) {
-      const rows = manualRowsPart1?.rows || [];
-      return buildVisualPromptsPrompt(rows, 0, rows.length);
-    }
-    if ((manualStep === 3 && !needsSplit) || (manualStep === 5 && needsSplit)) return buildTitlePrompt(manualRowsResult);
+    if (manualStep === 2) return needsSplit ? buildManualRowsPrompt(manualHookResult) : buildRowsPrompt(manualHookResult);
+    if (manualStep === 3) return buildTitlePrompt(manualRowsResult);
     return '';
   };
 
-  const manualStepLabels = needsSplit
-    ? ['', '1/5: 훅(Hook) 기획', '2/5: 대본 산문', '3/5: Row 분할', '4/5: 이미지/영상 프롬프트', '5/5: 제목 및 썸네일']
-    : ['', '1/3: 훅(Hook) 기획', '2/3: 대본 본문 생성', '3/3: 제목 및 썸네일'];
+  const manualStepLabels = ['', '1/3: 훅(Hook) 기획', '2/3: 대본 본문 생성', '3/3: 제목 및 썸네일'];
 
   const generateAll = async () => {
     setError('');
@@ -792,7 +807,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
   };
 
   // === Manual mode UI ===
-  if (mode === 'manual' && manualStep <= manualTotalSteps && !hasResults) {
+  if (mode === 'manual' && manualStep < 4 && !hasResults) {
     const prompt = getManualPrompt();
     return (
       <div className="panel-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
