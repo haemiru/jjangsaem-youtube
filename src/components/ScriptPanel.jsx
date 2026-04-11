@@ -696,23 +696,38 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
           allPrompts = [...allPrompts, ...batchPrompts.slice(0, expected)];
         }
 
-        // 누락된 프롬프트가 있으면 추가 생성
+        // 누락된 프롬프트 보충: 추가 생성 시도 → 실패 시 기본 프롬프트
         const missingIndices = allPrompts.map((p, i) => (!p.image_prompt ? i : -1)).filter(i => i >= 0);
-        if (missingIndices.length > 0 && missingIndices.length <= 30) {
+        if (missingIndices.length > 0) {
           setStreamText(prev => prev + `\n\n--- 누락된 ${missingIndices.length}개 프롬프트 보충 중 ---\n\n`);
-          const missingRows = missingIndices.map(i => scriptRows[i]);
-          const fillPrompt = buildVisualPromptsPrompt(missingRows, 0, missingRows.length);
-          const fillText = await runClaudeStream(
-            [{ role: "user", content: fillPrompt }],
-            plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 8000
-          );
-          const fillResult = parseJSON(fillText);
-          if (fillResult?.prompts) {
-            missingIndices.forEach((origIdx, j) => {
-              if (fillResult.prompts[j]) {
-                allPrompts[origIdx] = fillResult.prompts[j];
+          if (missingIndices.length <= 30) {
+            try {
+              const missingRows = missingIndices.map(i => scriptRows[i]);
+              const fillPrompt = buildVisualPromptsPrompt(missingRows, 0, missingRows.length);
+              const fillText = await runClaudeStream(
+                [{ role: "user", content: fillPrompt }],
+                plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 8000
+              );
+              const fillResult = parseJSON(fillText);
+              if (fillResult?.prompts) {
+                missingIndices.forEach((origIdx, j) => {
+                  if (fillResult.prompts[j]?.image_prompt) {
+                    allPrompts[origIdx] = fillResult.prompts[j];
+                  }
+                });
               }
-            });
+            } catch (e) { console.warn('프롬프트 보충 실패:', e); }
+          }
+          // 여전히 빈 프롬프트는 기본값으로 채우기
+          for (const idx of missingIndices) {
+            if (!allPrompts[idx]?.image_prompt) {
+              const row = scriptRows[idx];
+              const keyword = row.script.replace(/[.,!?~\-—]/g, '').trim().substring(0, 10);
+              allPrompts[idx] = {
+                image_prompt: `White background, cartoon therapist character speaking warmly, simple minimalist design, Korean text '${keyword}' inside a speech bubble near character, no other text, no English text`,
+                video_prompt: `Camera gently zooms in on character, character gestures naturally while speaking, warm lighting`
+              };
+            }
           }
         }
         const mergedRows = scriptRows.map((row, i) => ({
