@@ -671,26 +671,24 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         const scriptRows = splitResult.rows;
         const fullScript = splitResult.full_script || scriptRows.map(r => r.script).join('\n');
 
-        // Step 4: 이미지/영상 프롬프트 생성 (2배치로 분할)
-        setStreamText(prev => prev + `\n\n=== [4/5] 이미지/영상 프롬프트 생성 중 (${scriptRows.length}개 row) ===\n\n`);
-        const mid = Math.ceil(scriptRows.length / 2);
+        // Step 4: 이미지/영상 프롬프트 생성 (배치 분할)
+        const BATCH_SIZE = 50;
+        const batchCount = Math.ceil(scriptRows.length / BATCH_SIZE);
+        setStreamText(prev => prev + `\n\n=== [4/5] 이미지/영상 프롬프트 생성 중 (${scriptRows.length}개 row, ${batchCount}배치) ===\n\n`);
 
-        const vp1Prompt = buildVisualPromptsPrompt(scriptRows, 0, mid);
-        const vp1Text = await runClaudeStream(
-          [{ role: "user", content: vp1Prompt }],
-          plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 16000
-        );
-        const vp1Result = parseJSON(vp1Text);
-
-        setStreamText(prev => prev + '\n\n--- 후반부 프롬프트 생성 중 ---\n\n');
-        const vp2Prompt = buildVisualPromptsPrompt(scriptRows, mid, scriptRows.length);
-        const vp2Text = await runClaudeStream(
-          [{ role: "user", content: vp2Prompt }],
-          plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 16000
-        );
-        const vp2Result = parseJSON(vp2Text);
-
-        const allPrompts = [...(vp1Result?.prompts || []), ...(vp2Result?.prompts || [])];
+        let allPrompts = [];
+        for (let b = 0; b < batchCount; b++) {
+          const start = b * BATCH_SIZE;
+          const end = Math.min(start + BATCH_SIZE, scriptRows.length);
+          if (b > 0) setStreamText(prev => prev + `\n\n--- 배치 ${b + 1}/${batchCount} (row ${start + 1}~${end}) ---\n\n`);
+          const vpPrompt = buildVisualPromptsPrompt(scriptRows, start, end);
+          const vpText = await runClaudeStream(
+            [{ role: "user", content: vpPrompt }],
+            plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 16000
+          );
+          const vpResult = parseJSON(vpText);
+          allPrompts = [...allPrompts, ...(vpResult?.prompts || [])];
+        }
         const mergedRows = scriptRows.map((row, i) => ({
           ...row,
           image_prompt: allPrompts[i]?.image_prompt || '',
