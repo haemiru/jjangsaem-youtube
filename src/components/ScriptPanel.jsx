@@ -680,6 +680,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         for (let b = 0; b < batchCount; b++) {
           const start = b * BATCH_SIZE;
           const end = Math.min(start + BATCH_SIZE, scriptRows.length);
+          const expected = end - start;
           if (b > 0) setStreamText(prev => prev + `\n\n--- 배치 ${b + 1}/${batchCount} (row ${start + 1}~${end}) ---\n\n`);
           const vpPrompt = buildVisualPromptsPrompt(scriptRows, start, end);
           const vpText = await runClaudeStream(
@@ -687,7 +688,32 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
             plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 16000
           );
           const vpResult = parseJSON(vpText);
-          allPrompts = [...allPrompts, ...(vpResult?.prompts || [])];
+          const batchPrompts = vpResult?.prompts || [];
+          // 부족한 만큼 빈 프롬프트로 채우기
+          while (batchPrompts.length < expected) {
+            batchPrompts.push({ image_prompt: '', video_prompt: '' });
+          }
+          allPrompts = [...allPrompts, ...batchPrompts.slice(0, expected)];
+        }
+
+        // 누락된 프롬프트가 있으면 추가 생성
+        const missingIndices = allPrompts.map((p, i) => (!p.image_prompt ? i : -1)).filter(i => i >= 0);
+        if (missingIndices.length > 0 && missingIndices.length <= 30) {
+          setStreamText(prev => prev + `\n\n--- 누락된 ${missingIndices.length}개 프롬프트 보충 중 ---\n\n`);
+          const missingRows = missingIndices.map(i => scriptRows[i]);
+          const fillPrompt = buildVisualPromptsPrompt(missingRows, 0, missingRows.length);
+          const fillText = await runClaudeStream(
+            [{ role: "user", content: fillPrompt }],
+            plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 8000
+          );
+          const fillResult = parseJSON(fillText);
+          if (fillResult?.prompts) {
+            missingIndices.forEach((origIdx, j) => {
+              if (fillResult.prompts[j]) {
+                allPrompts[origIdx] = fillResult.prompts[j];
+              }
+            });
+          }
         }
         const mergedRows = scriptRows.map((row, i) => ({
           ...row,
