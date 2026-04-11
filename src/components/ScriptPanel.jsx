@@ -651,10 +651,10 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         let scriptResult = parseJSON(scriptText);
         if (!scriptResult?.rows) throw new Error("대본 텍스트 JSON 파싱 실패\n응답: " + scriptText.substring(0, 300));
 
-        // row 수 부족 시 이어쓰기 (최대 2회 추가 시도)
         let scriptRows = scriptResult.rows;
-        const hasCta = scriptRows.some(r => r.section === 'cta');
-        for (let attempt = 0; attempt < 2 && (scriptRows.length < lengthGuide.minRows || !scriptRows.some(r => r.section === 'cta')); attempt++) {
+
+        // 분량 부족 시 이어쓰기 (최대 2회)
+        for (let attempt = 0; attempt < 2 && scriptRows.length < lengthGuide.minRows; attempt++) {
           setStreamText(prev => prev + `\n\n--- 분량 부족 (${scriptRows.length}/${lengthGuide.minRows}개), 이어쓰기 ${attempt + 1}회 ---\n\n`);
           const continuePrompt = buildScriptOnlyPrompt(hookResult, { rows: scriptRows });
           const contText = await runClaudeStream(
@@ -662,10 +662,40 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
             plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 16000
           );
           const contResult = parseJSON(contText);
-          if (contResult?.rows) {
+          if (contResult?.rows?.length > 0) {
             scriptRows = [...scriptRows, ...contResult.rows];
           } else {
             break;
+          }
+        }
+
+        // CTA 섹션 누락 시 전용 생성
+        if (!scriptRows.some(r => r.section === 'cta')) {
+          setStreamText(prev => prev + '\n\n--- CTA 섹션 누락 → CTA 전용 생성 중 ---\n\n');
+          const lastScripts = scriptRows.slice(-5).map(r => r.script).join(' / ');
+          const ctaPrompt = `아래 대본의 마지막에 이어질 CTA(행동 유도) 섹션을 작성해줘.
+
+[대본 마지막 부분]
+${lastScripts}
+
+[CTA 작성 규칙]
+${pickCtaGuide()}
+- 반드시 마무리 인사로 끝낼 것 (예: "오늘도 시청해주셔서 감사합니다")
+- 연계 전자책: ${plan.ebookName}
+
+[출력 규칙]
+- 5~10개 row, 한 row 당 15~30자
+- section 값은 "cta"
+JSON 출력:
+{ "rows": [{ "section": "cta", "script": "CTA 문장" }] }
+JSON만 출력.`;
+          const ctaText = await runClaudeStream(
+            [{ role: "user", content: ctaPrompt }],
+            plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 4000
+          );
+          const ctaResult = parseJSON(ctaText);
+          if (ctaResult?.rows?.length > 0) {
+            scriptRows = [...scriptRows, ...ctaResult.rows];
           }
         }
 
