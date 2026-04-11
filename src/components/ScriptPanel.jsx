@@ -621,7 +621,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
 
     try {
       // ===== STEP 1: HOOK =====
-      setStreamText('=== [1/3] 훅(Hook) 기획 및 작성 중 ===\n\n');
+      setStreamText(`=== [1/${needsSplit ? '5' : '3'}] 훅(Hook) 기획 및 작성 중 ===\n\n`);
       const hookPrompt = buildHookPrompt();
 
       chatHistory.push({ role: "user", content: hookPrompt });
@@ -652,11 +652,6 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
           setStreamText(prev => prev + chunk);
         }, 16000);
         if (!proseText || proseText.trim().length === 0) throw new Error("대본 산문 생성 단계에서 API 응답이 비어있습니다.");
-
-        // CTA 섹션 포함 여부 확인
-        if (!proseText.includes('===SECTION:cta===')) {
-          throw new Error("대본에 CTA 섹션이 누락되었습니다. '전체 재생성'을 눌러 다시 시도해주세요.");
-        }
 
         // Step 3: 산문을 row JSON으로 변환
         setStreamText(prev => prev + '\n\n=== [3/5] 대본을 row 단위로 분할 중 ===\n\n');
