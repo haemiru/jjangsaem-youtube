@@ -23,8 +23,8 @@ export default async function handler(req, res) {
       ? (typeof req.body === 'string' ? req.body : JSON.stringify(req.body))
       : undefined;
 
-    // Check if client requested streaming
-    const isStream = body && JSON.parse(body).stream;
+    let isStream = false;
+    try { isStream = body && JSON.parse(body).stream; } catch {}
 
     const response = await fetch(target, {
       method: req.method,
@@ -33,28 +33,29 @@ export default async function handler(req, res) {
     });
 
     if (isStream && response.ok) {
-      // Stream SSE response back to client
       res.setHeader('content-type', 'text/event-stream');
       res.setHeader('cache-control', 'no-cache');
       res.setHeader('connection', 'keep-alive');
 
-      const reader = response.body.getReader();
+      // Node.js compatible streaming using async iterator
       try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          res.write(value);
+        for await (const chunk of response.body) {
+          res.write(chunk);
         }
+      } catch (streamErr) {
+        // Client may have disconnected
+        console.error('Stream error:', streamErr.message);
       } finally {
         res.end();
       }
     } else {
-      // Non-streaming: return full response
       const data = await response.text();
       res.setHeader('content-type', response.headers.get('content-type') || 'application/json');
       res.status(response.status).send(data);
     }
   } catch (e) {
-    res.status(500).json({ error: e.message, stack: e.stack });
+    if (!res.headersSent) {
+      res.status(500).json({ error: e.message });
+    }
   }
 }
