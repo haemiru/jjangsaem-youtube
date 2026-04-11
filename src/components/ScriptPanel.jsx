@@ -12,9 +12,10 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
   const [copiedId, setCopiedId] = useState(null);
   const [ttsSpeedLabel, setTtsSpeedLabel] = useState('1x');
   const [mode, setMode] = useState(null); // null: not chosen, 'auto', 'manual'
-  const [manualStep, setManualStep] = useState(1); // 1: hook, 2: rows (or rows-part1), 3: rows-part2 or titles, 4: titles (longform)
+  const [manualStep, setManualStep] = useState(1);
   const [manualInput, setManualInput] = useState('');
   const [manualHookResult, setManualHookResult] = useState(null);
+  const [manualProseText, setManualProseText] = useState('');
   const [manualRowsPart1, setManualRowsPart1] = useState(null);
   const [manualRowsResult, setManualRowsResult] = useState(null);
   const [manualError, setManualError] = useState('');
@@ -299,54 +300,9 @@ JSON만 출력.`;
   // 롱폼은 대본 텍스트 먼저 완성 → 이미지/영상 프롬프트 별도 생성
   const needsSplit = !isShorts;
 
-  // === 롱폼 전용: 대본 텍스트만 생성하는 프롬프트 ===
-  const buildScriptOnlyPrompt = (hookResult, continueFrom = null) => {
-    if (continueFrom) {
-      // 이어쓰기 모드: 부족한 분량을 채우기 위한 후속 호출
-      const existingScripts = continueFrom.rows.map(r => `[${r.section}] ${r.script}`).join('\n');
-      const existingSections = [...new Set(continueFrom.rows.map(r => r.section))];
-      const missingSections = ['hook', 'empathy', 'twist', 'core', 'solution', 'cta'].filter(s => !existingSections.includes(s));
-      const existingChars = continueFrom.rows.reduce((sum, r) => sum + r.script.length, 0);
-      const remainingChars = lengthGuide.minChars - existingChars;
-      const remainingRows = lengthGuide.minRows - continueFrom.rows.length;
-
-      return `아래는 지금까지 작성된 대본입니다. 분량이 부족하므로 이어서 작성해주세요.
-
-[현재까지 작성된 대본 — ${continueFrom.rows.length}개 row, ${existingChars}자]
-${existingScripts}
-
-[부족한 분량]
-- 현재: ${continueFrom.rows.length}개 row / ${existingChars}자
-- 목표: 최소 ${lengthGuide.minRows}개 row / ${lengthGuide.minChars}자
-- 추가 필요: 최소 ${remainingRows}개 row / ${remainingChars}자 이상
-${missingSections.length > 0 ? `- 빠진 섹션: ${missingSections.join(', ')} ← 반드시 포함할 것!` : ''}
-
-[이어쓰기 규칙]
-- 위 대본의 마지막 row에 자연스럽게 이어지도록 작성
-- ${missingSections.includes('cta') ? '반드시 cta 섹션과 마무리 인사를 포함할 것!' : ''}
-- 기존 내용을 반복하지 말 것 — 새로운 설명, 예시, 솔루션을 추가
-- 각 섹션의 내용을 더 풍부하게 확장 (구체적인 예시, 비유, 실천 방법 추가)
-
-포맷: ${plan.format}
-연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
-
-${missingSections.includes('cta') ? pickCtaGuide() : ''}
-
-[출력 규칙]
-- 한 row 당 한 호흡(약 15~30자) 단위
-- section 값: "hook", "empathy", "twist", "core", "solution", "cta" 중 하나
-- script와 section만 출력
-
-JSON 출력:
-{
-  "rows": [
-    { "section": "core", "script": "이어지는 대본 문장" }
-  ]
-}
-JSON만 출력.`;
-    }
-
-    return `위에서 기획한 요소를 이어받아, 전체 대본 텍스트를 작성해줘.
+  // === 롱폼 전용: 대본을 산문(일반 텍스트)으로 먼저 생성 ===
+  const buildProsePrompt = (hookResult) => {
+    return `위에서 기획한 요소를 이어받아, 유튜브 영상 대본을 일반 텍스트로 작성해줘.
 
 [기획된 요소]
 훅: ${hookResult.final_hook.text}
@@ -360,41 +316,64 @@ ${structureGuide}
 
 ${pickCtaGuide()}
 
-[⚠️⚠️⚠️ 분량 기준 — 가장 중요! 이 기준을 어기면 영상을 만들 수 없습니다 ⚠️⚠️⚠️]
+[⚠️ 분량 기준 — 반드시 지켜야 합니다]
 - 목표 영상 길이: ${lengthGuide.time}
-- 최소 row 수: ${lengthGuide.minRows}개 이상 (목표: ${lengthGuide.rows}개)
-- 최소 대본 글자 수: ${lengthGuide.minChars}자 이상 (목표: ${lengthGuide.chars}자)
-- 한국어 나레이션 기준 약 300자 = 1분입니다.
-- ${lengthGuide.time} 영상이려면 최소 ${lengthGuide.minChars}자가 필요합니다.
-- 70~80개 row로 끝내면 안 됩니다! 반드시 ${lengthGuide.minRows}개 이상 작성하세요.
-- 각 섹션을 충분히 풍부하게 작성하세요:
-  · core 섹션: 핵심 개념을 여러 비유와 예시로 깊이 있게 설명 (전체의 35%)
-  · solution 섹션: 구체적인 실천 방법을 BEFORE/AFTER와 함께 상세히 (전체의 25%)
-  · cta 섹션: 마무리 + CTA + 인사 (전체의 5~10%)
+- 한국어 나레이션 기준 약 300자 = 1분
+- 따라서 최소 ${lengthGuide.minChars}자 ~ ${lengthGuide.chars}자를 작성해야 합니다
+- 분량이 부족하면 영상을 만들 수 없습니다
 
 [알고리즘 핵심 전략]
 - 첫 3초 = 공포 or 궁금증
 - 중간 = 반전 (행동 → 뇌)
 - 끝 = 저장/공유 유도
 
-[출력 규칙]
-1. 대본을 짧게 끊어서 rows 배열에 넣어줘 (최소 ${lengthGuide.minRows}개 row 이상).
-   - 한 row 당 한 호흡(약 15~30자, 길어도 1문장) 단위로 잘라야 함. 절대 2문장을 한 row에 넣지 말 것.
-   - 한 문장이 길면 쉼표/접속사 단위로 잘라 여러 row로 분할해도 됨.
-2. 각 row에 section 필드를 반드시 포함 — 값은 "hook", "empathy", "twist", "core", "solution", "cta" 중 하나
-3. 이 단계에서는 script와 section만 출력 (image_prompt, video_prompt는 다음 단계에서 별도 생성)
+[출력 형식 — 반드시 이 형식으로]
+섹션 구분자 ===SECTION:이름=== 을 사용하여 아래 형식으로 출력하세요.
+JSON이 아닙니다. 일반 텍스트로 자연스럽게 써주세요.
+한 문장씩 줄바꿈으로 구분하세요.
 
-⚠️ 반드시 hook부터 cta까지 6개 섹션을 모두 포함할 것.
-⚠️ cta와 마무리 인사가 빠지면 절대 안 됩니다.
-⚠️ ${lengthGuide.minRows}개 row 미만이면 영상을 만들 수 없으므로, 내용을 더 풍부하게 작성하세요.
+===SECTION:hook===
+(훅 문장들, 한 문장씩 줄바꿈)
+
+===SECTION:empathy===
+(공감 문장들)
+
+===SECTION:twist===
+(반전 문장들)
+
+===SECTION:core===
+(핵심 설명 — 전체의 35%, 비유와 예시를 풍부하게)
+
+===SECTION:solution===
+(해결책 — 전체의 25%, BEFORE/AFTER 포함, 구체적 실천법)
+
+===SECTION:cta===
+(CTA + 마무리 인사)
+
+⚠️ 6개 섹션 모두 빠짐없이 작성할 것. 특히 cta 섹션은 반드시 포함!
+⚠️ 최소 ${lengthGuide.minChars}자 이상 작성할 것.`;
+  };
+
+  // === 롱폼 전용: 산문 대본을 row JSON으로 변환 ===
+  const buildSplitRowsPrompt = (proseText) => {
+    return `아래 대본 텍스트를 JSON rows 배열로 변환해줘.
+
+[대본 텍스트]
+${proseText}
+
+[변환 규칙]
+1. 각 문장을 하나의 row로 분리
+2. 긴 문장은 쉼표/접속사 단위로 잘라 여러 row로 분할 (한 row 당 약 15~30자)
+3. 각 row에 원문의 섹션에 맞는 section 값 부여: "hook", "empathy", "twist", "core", "solution", "cta"
+4. 원문의 ===SECTION:xxx=== 구분자를 기준으로 section 판단
+5. 원문의 내용을 빠뜨리지 말고 모두 포함할 것
 
 JSON 출력:
 {
   "rows": [
-    { "section": "hook", "script": "대본 문장" },
-    { "section": "empathy", "script": "공감 문장" }
+    { "section": "hook", "script": "대본 문장" }
   ],
-  "full_script": "전체 대본을 이어붙인 텍스트 (복사용)"
+  "full_script": "전체 대본을 이어붙인 텍스트"
 }
 JSON만 출력.`;
   };
@@ -520,38 +499,46 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
   };
 
   // === Manual mode: parse & save results ===
-  const manualTotalSteps = needsSplit ? 4 : 3;
+  const manualTotalSteps = needsSplit ? 5 : 3;
 
   const handleManualSubmit = () => {
     setManualError('');
-    const parsed = parseJSON(manualInput);
-    if (!parsed) {
-      setManualError('JSON 파싱 실패. Claude의 응답에서 JSON 부분만 복사해서 붙여넣어 주세요.');
-      return;
-    }
 
     if (manualStep === 1) {
-      // Hook result
+      // Hook result (JSON)
+      const parsed = parseJSON(manualInput);
+      if (!parsed) { setManualError('JSON 파싱 실패.'); return; }
       if (!parsed.final_hook) { setManualError('final_hook 필드가 없습니다.'); return; }
       setManualHookResult(parsed);
       setManualStep(2);
       setManualInput('');
     } else if (manualStep === 2 && needsSplit) {
-      // 롱폼: 대본 텍스트 (section + script only)
-      if (!parsed.rows) { setManualError('rows 필드가 없습니다.'); return; }
-      setManualRowsPart1(parsed); // 대본 텍스트 저장
+      // 롱폼: 산문 대본 (일반 텍스트)
+      if (!manualInput.includes('===SECTION:')) { setManualError('===SECTION:xxx=== 구분자가 없습니다. 산문 형식 그대로 붙여넣어 주세요.'); return; }
+      setManualProseText(manualInput);
       setManualStep(3);
       setManualInput('');
     } else if (manualStep === 2 && !needsSplit) {
-      // 쇼츠: 전체 rows (script + image/video prompt)
+      // 쇼츠: 전체 rows (JSON)
+      const parsed = parseJSON(manualInput);
+      if (!parsed) { setManualError('JSON 파싱 실패.'); return; }
       if (!parsed.rows) { setManualError('rows 필드가 없습니다.'); return; }
       setManualRowsResult(parsed);
       setManualStep(3);
       setManualInput('');
     } else if (manualStep === 3 && needsSplit) {
-      // 롱폼: 이미지/영상 프롬프트 (prompts 배열)
+      // 롱폼: row 분할 결과 (JSON)
+      const parsed = parseJSON(manualInput);
+      if (!parsed) { setManualError('JSON 파싱 실패.'); return; }
+      if (!parsed.rows) { setManualError('rows 필드가 없습니다.'); return; }
+      setManualRowsPart1(parsed);
+      setManualStep(4);
+      setManualInput('');
+    } else if (manualStep === 4 && needsSplit) {
+      // 롱폼: 이미지/영상 프롬프트 (JSON)
+      const parsed = parseJSON(manualInput);
+      if (!parsed) { setManualError('JSON 파싱 실패.'); return; }
       if (!parsed.prompts) { setManualError('prompts 필드가 없습니다.'); return; }
-      // 대본 텍스트 + 프롬프트 합치기
       const scriptRows = manualRowsPart1?.rows || [];
       const mergedRows = scriptRows.map((row, i) => ({
         ...row,
@@ -560,10 +547,12 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
       }));
       const fullScript = scriptRows.map(r => r.script).join('\n');
       setManualRowsResult({ rows: mergedRows, full_script: fullScript });
-      setManualStep(4);
+      setManualStep(5);
       setManualInput('');
-    } else if ((manualStep === 3 && !needsSplit) || (manualStep === 4 && needsSplit)) {
-      // Title result — save everything
+    } else if ((manualStep === 3 && !needsSplit) || (manualStep === 5 && needsSplit)) {
+      // Title result (JSON)
+      const parsed = parseJSON(manualInput);
+      if (!parsed) { setManualError('JSON 파싱 실패.'); return; }
       const fullScript = manualRowsResult.full_script || manualRowsResult.rows?.map(r => r.script).join('\n') || '';
       const finalState = {
         ...globalScript,
@@ -590,18 +579,19 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
 
   const getManualPrompt = () => {
     if (manualStep === 1) return buildHookPrompt();
-    if (manualStep === 2 && needsSplit) return buildScriptOnlyPrompt(manualHookResult);
+    if (manualStep === 2 && needsSplit) return buildProsePrompt(manualHookResult);
     if (manualStep === 2 && !needsSplit) return buildRowsPrompt(manualHookResult);
-    if (manualStep === 3 && needsSplit) {
+    if (manualStep === 3 && needsSplit) return buildSplitRowsPrompt(manualProseText);
+    if (manualStep === 4 && needsSplit) {
       const rows = manualRowsPart1?.rows || [];
       return buildVisualPromptsPrompt(rows, 0, rows.length);
     }
-    if ((manualStep === 3 && !needsSplit) || (manualStep === 4 && needsSplit)) return buildTitlePrompt(manualRowsResult);
+    if ((manualStep === 3 && !needsSplit) || (manualStep === 5 && needsSplit)) return buildTitlePrompt(manualRowsResult);
     return '';
   };
 
   const manualStepLabels = needsSplit
-    ? ['', '1/4: 훅(Hook) 기획', '2/4: 대본 텍스트', '3/4: 이미지/영상 프롬프트', '4/4: 제목 및 썸네일']
+    ? ['', '1/5: 훅(Hook) 기획', '2/5: 대본 산문', '3/5: Row 분할', '4/5: 이미지/영상 프롬프트', '5/5: 제목 및 썸네일']
     : ['', '1/3: 훅(Hook) 기획', '2/3: 대본 본문 생성', '3/3: 제목 및 썸네일'];
 
   const generateAll = async () => {
@@ -633,79 +623,43 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
       setCurrentStep(2);
 
       if (needsSplit) {
-        // === 롱폼: 대본 텍스트 먼저 완성 → 이미지/영상 프롬프트 별도 생성 ===
+        // === 롱폼: 산문 → row 분할 → 이미지/영상 프롬프트 ===
 
-        // Step 2: 전체 대본 텍스트 생성 (section + script만, 출력 매우 작음)
-        setStreamText(prev => prev + '\n\n=== [2/4] 전체 대본 텍스트 생성 중 ===\n\n');
-        const scriptPrompt = buildScriptOnlyPrompt(hookResult);
-        const scriptMessages = [
+        // Step 2: 산문(일반 텍스트)으로 전체 대본 생성
+        setStreamText(prev => prev + '\n\n=== [2/5] 전체 대본 산문 생성 중 ===\n\n');
+        const prosePrompt = buildProsePrompt(hookResult);
+        const proseMessages = [
           { role: "user", content: `훅 기획 결과:\n${JSON.stringify({ final_hook: hookResult.final_hook, empathy: hookResult.empathy, twist: hookResult.twist })}` },
           { role: "assistant", content: "네, 훅 기획 결과를 확인했습니다. 대본 작성을 시작하겠습니다." },
-          { role: "user", content: scriptPrompt }
+          { role: "user", content: prosePrompt }
         ];
-        const scriptText = await runClaudeStream(scriptMessages, plan.model, null, (chunk) => {
+        const proseText = await runClaudeStream(proseMessages, plan.model, null, (chunk) => {
           setStreamText(prev => prev + chunk);
         }, 16000);
-        if (!scriptText || scriptText.trim().length === 0) throw new Error("대본 텍스트 생성 단계에서 API 응답이 비어있습니다.");
+        if (!proseText || proseText.trim().length === 0) throw new Error("대본 산문 생성 단계에서 API 응답이 비어있습니다.");
 
-        let scriptResult = parseJSON(scriptText);
-        if (!scriptResult?.rows) throw new Error("대본 텍스트 JSON 파싱 실패\n응답: " + scriptText.substring(0, 300));
-
-        let scriptRows = scriptResult.rows;
-
-        // 분량 부족 시 이어쓰기 (최대 2회)
-        for (let attempt = 0; attempt < 2 && scriptRows.length < lengthGuide.minRows; attempt++) {
-          setStreamText(prev => prev + `\n\n--- 분량 부족 (${scriptRows.length}/${lengthGuide.minRows}개), 이어쓰기 ${attempt + 1}회 ---\n\n`);
-          const continuePrompt = buildScriptOnlyPrompt(hookResult, { rows: scriptRows });
-          const contText = await runClaudeStream(
-            [{ role: "user", content: continuePrompt }],
-            plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 16000
-          );
-          const contResult = parseJSON(contText);
-          if (contResult?.rows?.length > 0) {
-            scriptRows = [...scriptRows, ...contResult.rows];
-          } else {
-            break;
-          }
+        // CTA 섹션 포함 여부 확인
+        if (!proseText.includes('===SECTION:cta===')) {
+          throw new Error("대본에 CTA 섹션이 누락되었습니다. '전체 재생성'을 눌러 다시 시도해주세요.");
         }
 
-        // CTA 섹션 누락 시 전용 생성
-        if (!scriptRows.some(r => r.section === 'cta')) {
-          setStreamText(prev => prev + '\n\n--- CTA 섹션 누락 → CTA 전용 생성 중 ---\n\n');
-          const lastScripts = scriptRows.slice(-5).map(r => r.script).join(' / ');
-          const ctaPrompt = `아래 대본의 마지막에 이어질 CTA(행동 유도) 섹션을 작성해줘.
+        // Step 3: 산문을 row JSON으로 변환
+        setStreamText(prev => prev + '\n\n=== [3/5] 대본을 row 단위로 분할 중 ===\n\n');
+        const splitPrompt = buildSplitRowsPrompt(proseText);
+        const splitText = await runClaudeStream(
+          [{ role: "user", content: splitPrompt }],
+          plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 16000
+        );
+        const splitResult = parseJSON(splitText);
+        if (!splitResult?.rows) throw new Error("Row 분할 JSON 파싱 실패\n응답: " + splitText.substring(0, 300));
 
-[대본 마지막 부분]
-${lastScripts}
+        const scriptRows = splitResult.rows;
+        const fullScript = splitResult.full_script || scriptRows.map(r => r.script).join('\n');
 
-[CTA 작성 규칙]
-${pickCtaGuide()}
-- 반드시 마무리 인사로 끝낼 것 (예: "오늘도 시청해주셔서 감사합니다")
-- 연계 전자책: ${plan.ebookName}
-
-[출력 규칙]
-- 5~10개 row, 한 row 당 15~30자
-- section 값은 "cta"
-JSON 출력:
-{ "rows": [{ "section": "cta", "script": "CTA 문장" }] }
-JSON만 출력.`;
-          const ctaText = await runClaudeStream(
-            [{ role: "user", content: ctaPrompt }],
-            plan.model, null, (chunk) => { setStreamText(prev => prev + chunk); }, 4000
-          );
-          const ctaResult = parseJSON(ctaText);
-          if (ctaResult?.rows?.length > 0) {
-            scriptRows = [...scriptRows, ...ctaResult.rows];
-          }
-        }
-
-        const fullScript = scriptRows.map(r => r.script).join('\n');
-
-        // Step 3: 이미지/영상 프롬프트 생성 (2배치로 분할)
-        setStreamText(prev => prev + `\n\n=== [3/4] 이미지/영상 프롬프트 생성 중 (${scriptRows.length}개 row) ===\n\n`);
+        // Step 4: 이미지/영상 프롬프트 생성 (2배치로 분할)
+        setStreamText(prev => prev + `\n\n=== [4/5] 이미지/영상 프롬프트 생성 중 (${scriptRows.length}개 row) ===\n\n`);
         const mid = Math.ceil(scriptRows.length / 2);
 
-        // 배치 1: 전반부 rows
         const vp1Prompt = buildVisualPromptsPrompt(scriptRows, 0, mid);
         const vp1Text = await runClaudeStream(
           [{ role: "user", content: vp1Prompt }],
@@ -713,7 +667,6 @@ JSON만 출력.`;
         );
         const vp1Result = parseJSON(vp1Text);
 
-        // 배치 2: 후반부 rows
         setStreamText(prev => prev + '\n\n--- 후반부 프롬프트 생성 중 ---\n\n');
         const vp2Prompt = buildVisualPromptsPrompt(scriptRows, mid, scriptRows.length);
         const vp2Text = await runClaudeStream(
@@ -722,7 +675,6 @@ JSON만 출력.`;
         );
         const vp2Result = parseJSON(vp2Text);
 
-        // 대본 + 프롬프트 합치기
         const allPrompts = [...(vp1Result?.prompts || []), ...(vp2Result?.prompts || [])];
         const mergedRows = scriptRows.map((row, i) => ({
           ...row,
@@ -733,7 +685,7 @@ JSON만 출력.`;
         rowsResult = { rows: mergedRows, full_script: fullScript };
 
         // chatHistory에 요약만 넣기 (제목 생성용)
-        chatHistory.push({ role: "user", content: scriptPrompt });
+        chatHistory.push({ role: "user", content: prosePrompt });
         chatHistory.push({ role: "assistant", content: JSON.stringify({ rows: mergedRows.slice(0, 5).map(r => ({ section: r.section, script: r.script })), total_rows: mergedRows.length, full_script: fullScript }) });
 
       } else {
@@ -753,7 +705,7 @@ JSON만 출력.`;
 
       // ===== STEP 3: TITLES & THUMBNAILS =====
       setCurrentStep(3);
-      setStreamText(prev => prev + `\n\n=== [${needsSplit ? '4/4' : '3/3'}] 제목 및 썸네일 기획 중 ===\n\n`);
+      setStreamText(prev => prev + `\n\n=== [${needsSplit ? '5/5' : '3/3'}] 제목 및 썸네일 기획 중 ===\n\n`);
 
       const titlePrompt = buildTitlePrompt(rowsResult);
 
@@ -846,7 +798,7 @@ JSON만 출력.`;
       <div className="panel-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 className="panel-title" style={{ margin: 0 }}>수동 모드 — {manualStepLabels[manualStep]}</h2>
-          <button className="btn-secondary" onClick={() => { setMode(null); setManualStep(1); setManualHookResult(null); setManualRowsPart1(null); setManualRowsResult(null); setManualInput(''); setManualError(''); }}>
+          <button className="btn-secondary" onClick={() => { setMode(null); setManualStep(1); setManualHookResult(null); setManualProseText(''); setManualRowsPart1(null); setManualRowsResult(null); setManualInput(''); setManualError(''); }}>
             모드 선택으로 돌아가기
           </button>
         </div>
