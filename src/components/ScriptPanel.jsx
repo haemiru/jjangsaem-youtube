@@ -90,15 +90,15 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
     ? `캐릭터 설명: ${plan.characterDescription}`
     : '업로드된 캐릭터 이미지를 참고';
 
-  // row 수를 약 1.5~2배로 늘려 이미지가 더 자주 바뀌도록 (시청자 지루함 방지)
+  // row 1개 = 이미지 1장 → 1~2문장(50~80자) 단위로 자르기
   const lengthGuide = (() => {
     const f = plan.format;
-    if (f === '쇼츠 15~30초') return { rows: '14~22', minRows: 14, chars: '300~500', minChars: 300, time: '15~30초' };
-    if (f === '쇼츠 60초') return { rows: '28~44', minRows: 28, chars: '700~1000', minChars: 700, time: '50~60초' };
-    if (f === '일반 4~5분') return { rows: '100~130', minRows: 100, chars: '3000~4000', minChars: 3000, time: '4~5분' };
-    if (f === '일반 8~10분') return { rows: '170~220', minRows: 170, chars: '6000~8000', minChars: 6000, time: '8~10분' };
-    if (f === '일반 10분 이상') return { rows: '230~290', minRows: 230, chars: '8000~11000', minChars: 8000, time: '10분 이상' };
-    return { rows: '100~160', minRows: 100, chars: '4000~6000', minChars: 4000, time: '5~10분' };
+    if (f === '쇼츠 15~30초') return { rows: '8~12', minRows: 8, chars: '300~500', minChars: 300, time: '15~30초' };
+    if (f === '쇼츠 60초') return { rows: '15~22', minRows: 15, chars: '700~1000', minChars: 700, time: '50~60초' };
+    if (f === '일반 4~5분') return { rows: '50~70', minRows: 50, chars: '3000~4000', minChars: 3000, time: '4~5분' };
+    if (f === '일반 8~10분') return { rows: '80~110', minRows: 80, chars: '6000~8000', minChars: 6000, time: '8~10분' };
+    if (f === '일반 10분 이상') return { rows: '110~150', minRows: 110, chars: '8000~11000', minChars: 8000, time: '10분 이상' };
+    return { rows: '60~90', minRows: 60, chars: '4000~6000', minChars: 4000, time: '5~10분' };
   })();
 
   // CTA 다양화 — 매 생성마다 랜덤 스타일 1~2개 선택, 일정 확률로 구독/좋아요 멘트 포함
@@ -272,9 +272,9 @@ JSON만 출력.`;
 
   const shortsRowOutputRules = `[출력 규칙]
 1. 대본을 짧게 끊어서 rows 배열에 넣어줘.
-   - 한 row 당 한 호흡(약 15~30자, 길어도 1문장) 단위로 잘라야 함. 절대 2문장을 한 row에 넣지 말 것.
-   - 한 문장이 길면 쉼표/접속사 단위로 잘라 여러 row로 분할해도 됨.
-   - 이렇게 잘게 자르는 이유: row 1개당 이미지가 1장이라, 잘게 자를수록 화면 전환이 빨라져서 시청자가 덜 지루해짐.
+   - 한 row 당 1문장(약 30~50자) 단위로 잘라야 함.
+   - row 1개 = 이미지 1장이므로, 하나의 장면 단위로 묶을 것.
+   - 한 문장을 쉼표 단위로 여러 row로 쪼개지 말 것.
 2. 각 row에 section 필드를 반드시 포함 — 값은 "hook", "explain", "core", "cta" 중 하나
 3. ${imagePromptRules}
 
@@ -362,11 +362,12 @@ JSON이 아닙니다. 일반 텍스트로 자연스럽게 써주세요.
 ${proseText}
 
 [변환 규칙]
-1. 각 문장을 하나의 row로 분리
-2. 긴 문장은 쉼표/접속사 단위로 잘라 여러 row로 분할 (한 row 당 약 15~30자)
-3. 각 row에 원문의 섹션에 맞는 section 값 부여: "hook", "empathy", "twist", "core", "solution", "cta"
-4. 원문의 ===SECTION:xxx=== 구분자를 기준으로 section 판단
-5. 원문의 내용을 빠뜨리지 말고 모두 포함할 것
+1. 1~2문장을 하나의 row로 묶기 (한 row 당 약 50~80자)
+2. 한 row = 이미지 1장이므로, 의미 단위로 적절히 묶어야 함
+3. 너무 잘게 자르지 말 것 — "많은 부모님들이," / "괜찮다고 생각하지만" 처럼 한 문장을 여러 row로 나누지 말 것
+4. 각 row에 원문의 섹션에 맞는 section 값 부여: "hook", "empathy", "twist", "core", "solution", "cta"
+5. 원문의 ===SECTION:xxx=== 구분자를 기준으로 section 판단
+6. 원문의 내용을 빠뜨리지 말고 모두 포함할 것
 
 JSON 출력:
 {
@@ -436,10 +437,10 @@ ${styleGuide}
 - 끝 = 저장/공유 유도
 
 [출력 규칙]
-1. 대본을 짧게 끊어서 rows 배열에 넣어줘 (총 ${lengthGuide.rows}개 row).
-   - 한 row 당 한 호흡(약 15~30자, 길어도 1문장) 단위로 잘라야 함. 절대 2문장을 한 row에 넣지 말 것.
-   - 한 문장이 길면 쉼표/접속사 단위로 잘라 여러 row로 분할해도 됨.
-   - 이렇게 잘게 자르는 이유: row 1개당 이미지가 1장이라, 잘게 자를수록 화면 전환이 빨라져서 시청자가 덜 지루해짐.
+1. 대본을 의미 단위로 끊어서 rows 배열에 넣어줘 (총 ${lengthGuide.rows}개 row).
+   - 한 row 당 1~2문장(약 50~80자) 단위로 묶어야 함.
+   - row 1개 = 이미지 1장이므로, 하나의 장면/의미 단위로 적절히 묶을 것.
+   - 한 문장을 여러 row로 쪼개지 말 것 (예: "많은 부모님들이," / "괜찮다고 생각하지만" ← 이렇게 나누면 안 됨).
 2. 각 row에 section 필드를 반드시 포함 — 값은 "hook", "empathy", "twist", "core", "solution", "cta" 중 하나
 3. ${imagePromptRules}
 
