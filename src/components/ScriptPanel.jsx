@@ -601,11 +601,20 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
     }
   };
 
+  const MANUAL_PREFIX = `[중요 지시] 아래는 유튜브 영상 대본 자동화 파이프라인의 프롬프트입니다.
+- 아티팩트(Artifact)를 만들지 마세요.
+- 코드, UI, 앱을 생성하지 마세요.
+- 아래 지시사항을 그대로 따라서 JSON만 텍스트로 출력해주세요.
+---
+
+`;
+
   const getManualPrompt = () => {
-    if (manualStep === 1) return buildHookPrompt();
-    if (manualStep === 2) return needsSplit ? buildManualRowsPrompt(manualHookResult) : buildRowsPrompt(manualHookResult);
-    if (manualStep === 3) return buildTitlePrompt(manualRowsResult);
-    return '';
+    let prompt = '';
+    if (manualStep === 1) prompt = buildHookPrompt();
+    else if (manualStep === 2) prompt = needsSplit ? buildManualRowsPrompt(manualHookResult) : buildRowsPrompt(manualHookResult);
+    else if (manualStep === 3) prompt = buildTitlePrompt(manualRowsResult);
+    return prompt ? MANUAL_PREFIX + prompt : '';
   };
 
   const manualStepLabels = ['', '1/3: 훅(Hook) 기획', '2/3: 대본 본문 생성', '3/3: 제목 및 썸네일'];
