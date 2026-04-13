@@ -73,6 +73,13 @@ export default function UploadPanel({ globalState, updateState, onNext, setActiv
     }
   };
 
+  // Restore saved metadata from globalState on mount
+  useEffect(() => {
+    if (!localMeta && metadata?.title?.text) {
+      setLocalMeta(metadata);
+    }
+  }, []);
+
   // Verify token on mount if we had one
   useEffect(() => {
     if (accessToken) {

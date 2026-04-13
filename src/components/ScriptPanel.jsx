@@ -28,7 +28,7 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
   const streamEndRef = useRef(null);
 
   const isGenerating = currentStep > 0 && currentStep < 4;
-  const hasResults = globalScript && globalScript.final_hook && !isGenerating && currentStep === 0;
+  const hasResults = globalScript && globalScript.final_hook && globalScript.rows?.length > 0 && !isGenerating && (currentStep === 0 || currentStep === 4);
 
   useEffect(() => {
     if (streamEndRef.current) {
@@ -103,7 +103,6 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
 
   // CTA 다양화 — 매 생성마다 랜덤 스타일 1~2개 선택, 일정 확률로 구독/좋아요 멘트 포함
   const ctaStylePool = [
-    { name: '저장형', desc: '"지금 저장해두고 잠들기 전에 다시 보세요" 처럼, 영상을 저장해 다시 보도록 유도' },
     { name: '공유형', desc: '"같은 고민하는 부모님께 공유해주세요" 처럼, 주변 부모에게 공유 유도 (단, 너무 식상한 표현은 피할 것)' },
     { name: '댓글질문형', desc: '"우리 아이는 어땠나요? 댓글로 알려주세요" 처럼, 시청자 경험을 댓글로 묻는 방식' },
     { name: '실천약속형', desc: '"오늘 밤부터 딱 한 가지만 시도해보세요" 처럼, 작은 실천 한 가지를 약속하게 만드는 방식' },
@@ -130,7 +129,8 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
       includeSubscribe
         ? `또한 CTA 안에 구독·좋아요 멘트를 자연스럽게 한 줄 포함하세요. 예시 톤: "${subscribeLine}" (예시 그대로 쓰지 말고 영상 톤에 맞게 변형)`
         : '이번 영상은 구독·좋아요 멘트는 생략하고, 위 스타일에만 집중하세요.',
-      '⚠️ 다음 표현은 식상하므로 사용 금지: "이건 꼭 부모님이 알아야 합니다", "유용하면 저장하세요", "주변 부모님께 공유해주세요" (똑같은 문장 그대로). 같은 의도라도 새로운 표현으로 바꿔 쓸 것.',
+      '⚠️ 다음 표현은 사용 금지: "이건 꼭 부모님이 알아야 합니다", "유용하면 저장하세요", "주변 부모님께 공유해주세요", "이 영상을 저장해두세요", "저장해두고 다시 보세요" (똑같은 문장 그대로). 같은 의도라도 새로운 표현으로 바꿔 쓸 것.',
+      '⚠️ "저장" 유도 CTA는 절대 사용하지 마세요. 유튜브에서 저장을 유도하는 CTA는 부자연스럽습니다. 대신 구독, 좋아요, 댓글, 공유, 다음 영상 예고 등으로 유도하세요.',
       '⚠️ CTA는 단순 명령형이 아니라, 본문에서 다룬 핵심 내용과 자연스럽게 이어지도록 한 문장 이상의 맥락과 함께 작성하세요.',
       '⚠️ 대본의 맨 마지막 row는 반드시 마무리 인사로 끝낼 것. 예: "오늘도 시청해주셔서 감사합니다", "끝까지 함께해주셔서 감사해요", "다음 영상에서 또 만나요". 매번 표현은 다르게 변형. (구독·좋아요 멘트와는 별도의 row로 분리 가능)',
     ];
@@ -325,7 +325,7 @@ ${pickCtaGuide()}
 [알고리즘 핵심 전략]
 - 첫 3초 = 공포 or 궁금증
 - 중간 = 반전 (행동 → 뇌)
-- 끝 = 저장/공유 유도
+- 끝 = 구독/좋아요 유도 또는 다음 영상 예고
 
 [출력 형식 — 반드시 이 형식으로]
 섹션 구분자 ===SECTION:이름=== 을 사용하여 아래 형식으로 출력하세요.
@@ -351,7 +351,9 @@ JSON이 아닙니다. 일반 텍스트로 자연스럽게 써주세요.
 (CTA + 마무리 인사)
 
 ⚠️ 6개 섹션 모두 빠짐없이 작성할 것. 특히 cta 섹션은 반드시 포함!
-⚠️ 최소 ${lengthGuide.minChars}자 이상 작성할 것.`;
+⚠️ 최소 ${lengthGuide.minChars}자 이상 작성할 것. 이 분량이 부족하면 row 수가 모자라서 영상을 만들 수 없습니다.
+⚠️ 목표 문장 수: 최소 ${lengthGuide.minRows}개 문장. 한 문장 = 영상의 한 장면(이미지 1장)이므로 충분한 문장 수가 필요합니다.
+⚠️ core와 solution 섹션을 특히 풍부하게 작성하세요. 비유, 예시, 구체적 상황 묘사를 충분히 포함해야 합니다.`;
   };
 
   // === 롱폼 전용: 산문 대본을 row JSON으로 변환 ===
@@ -368,6 +370,11 @@ ${proseText}
 4. 각 row에 원문의 섹션에 맞는 section 값 부여: "hook", "empathy", "twist", "core", "solution", "cta"
 5. 원문의 ===SECTION:xxx=== 구분자를 기준으로 section 판단
 6. 원문의 내용을 빠뜨리지 말고 모두 포함할 것
+7. 긴 문장(50자 이상)은 의미 단위로 2개 row로 나눌 것. row 1개 = 이미지 1장이므로, 한 row가 너무 길면 이미지와 맞지 않음.
+
+⚠️ 목표 row 수: 최소 ${lengthGuide.minRows}개 ~ ${lengthGuide.rows}개.
+row가 ${lengthGuide.minRows}개 미만이면 문장을 더 세밀하게 나눠야 합니다.
+row 1개 = 이미지 1장 = 영상의 한 장면입니다. 4~5분 영상이면 최소 60개, 8~10분이면 최소 90개가 필요합니다.
 
 JSON 출력:
 {
@@ -434,7 +441,7 @@ ${styleGuide}
 [알고리즘 핵심 전략]
 - 첫 3초 = 공포 or 궁금증
 - 중간 = 반전 (행동 → 뇌)
-- 끝 = 저장/공유 유도
+- 끝 = 구독/좋아요 유도 또는 다음 영상 예고
 
 [출력 규칙]
 1. 대본의 한 문장 = 1 row로 나눠줘. 마침표(.), 물음표(?), 느낌표(!) 기준.
@@ -486,7 +493,7 @@ ${styleGuide}
 [알고리즘 핵심 전략]
 - 첫 3초 = 공포 or 궁금증
 - 중간 = 반전 (행동 → 뇌)
-- 끝 = 저장/공유 유도
+- 끝 = 구독/좋아요 유도 또는 다음 영상 예고
 
 ${shortsRowOutputRules}`;
   };
