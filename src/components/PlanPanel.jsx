@@ -73,16 +73,26 @@ export default function PlanPanel({ globalState, updateState, onNext }) {
 [요청 — 반드시 두 종류 모두 생성할 것]
 전자책 내용을 분석하여 아래 두 종류를 모두 생성해:
 
-★ 롱폼 영상 (일반 8~10분) — 반드시 5~6개
-  - 전자책 핵심 챕터/테마별로 1개씩
+★ 롱폼 영상 (일반 8~10분) — 반드시 3개
+  - 전자책을 3개의 큰 주제 덩어리로 나누어 각각 1개씩
   - format 값은 반드시 "일반 8~10분"
 
-★ 쇼츠 (15~30초) — 반드시 8~10개
-  - 전자책에서 뽑은 짧은 포인트들
+★ 쇼츠 (15~30초) — 반드시 5개
+  - 전자책의 각기 다른 세부 포인트 5개
   - format 값은 반드시 "쇼츠 15~30초"
 
-총 13~16개 항목이 나와야 합니다. 롱폼이 0개이면 안 됩니다.
-각 주제는 유튜브에서 클릭을 유발하는 제목 형태로 작성해주세요.
+총 8개 항목. 롱폼 3개, 쇼츠 5개. 반드시 정확히 이 개수로 생성.
+
+[가장 중요한 원칙 — 내용 중복 금지]
+- 각 영상은 전자책의 "서로 다른 특정 부분"만 집중적으로 다뤄야 합니다.
+- 1번 영상과 2번 영상이 같은 챕터/사례/노하우를 다루면 안 됩니다.
+- 롱폼 3개는 책을 3등분하듯 각자 맡은 영역만 깊이 다루고, 다른 롱폼이 맡은 영역은 언급만 하고 건드리지 않습니다.
+- 쇼츠 5개도 마찬가지로 서로 다른 포인트/팁/사례 하나씩만.
+- 큰 맥락(채널/책 전체 주제)은 공유하되, 세부 내용은 반드시 포커싱된 영역에서만 끌어오세요.
+
+각 항목에는 반드시 "focus" 필드를 포함하세요. 이 필드는 해당 영상이 집중할 책의 특정 범위(챕터명, 섹션, 사례, 핵심 개념)를 구체적으로 명시합니다. 나중에 대본 작성 시 이 범위 밖의 내용은 사용하지 않습니다.
+
+각 제목은 유튜브에서 클릭을 유발하는 형태로.
 
 [전자책 내용]
 ${pdfText.substring(0, 20000)}
@@ -90,8 +100,8 @@ ${pdfText.substring(0, 20000)}
 JSON으로 출력:
 {
   "items": [
-    { "title": "영상 제목", "format": "일반 8~10분", "desc": "이 영상에서 다룰 핵심 내용 1줄 요약" },
-    { "title": "쇼츠 제목", "format": "쇼츠 15~30초", "desc": "핵심 포인트 1줄" }
+    { "title": "영상 제목", "format": "일반 8~10분", "focus": "이 영상이 집중할 책의 특정 챕터/섹션/사례 (다른 영상과 절대 겹치지 않게)", "desc": "이 영상에서 다룰 핵심 내용 1줄 요약" },
+    { "title": "쇼츠 제목", "format": "쇼츠 15~30초", "focus": "이 쇼츠가 집중할 구체적 포인트 1개", "desc": "핵심 포인트 1줄" }
   ]
 }
 JSON만 출력.`;
@@ -134,7 +144,7 @@ JSON만 출력.`;
   };
 
   // Summarize ebook for current topic
-  const summarizeForTopic = async (topic) => {
+  const summarizeForTopic = async (topic, focus = '') => {
     if (!localFile) return;
 
     setIsSummarizing(true);
@@ -143,8 +153,12 @@ JSON만 출력.`;
     try {
       const pdfText = await extractPdfText(localFile);
 
+      const focusBlock = focus
+        ? `\n[이 영상이 집중해야 할 책의 특정 범위]\n${focus}\n\n반드시 위 범위에 해당하는 내용만 뽑아내세요. 책 전체를 요약하지 말고, 이 범위의 세부 내용(사례, 수치, 구체적 노하우)만 깊이 있게 정리하세요. 다른 영상이 다룰 범위는 건드리지 마세요.`
+        : '';
+
       const prompt = `다음은 사용자가 업로드한 전자책 PDF의 본문 텍스트(일부)입니다.
-현재 기획 중인 유튜브 영상의 주제는 [${topic}] 입니다.
+현재 기획 중인 유튜브 영상의 주제는 [${topic}] 입니다.${focusBlock}
 이 주제와 관련된 내용을 중심으로, PDF의 핵심 노하우와 주요 목차를 요약해주세요. (이 요약본은 이후 대본 작성 프롬프트로 전달됩니다.)
 텍스트가 너무 길면 핵심 위주로 1000자 이내로 압축해주세요.
 
@@ -189,9 +203,9 @@ ${pdfText.substring(0, 20000)}`;
     const defaultFormat = item.format.startsWith('쇼츠') ? '쇼츠 60초' : '일반 4~5분';
     updateState('plan', { ...data, topic: item.title, format: defaultFormat });
 
-    // Auto-summarize for this topic
+    // Auto-summarize for this topic — pass focus so the summary narrows to the item's assigned range
     if (localFile) {
-      summarizeForTopic(item.title);
+      summarizeForTopic(item.title, item.focus || item.desc || '');
     }
   };
 
