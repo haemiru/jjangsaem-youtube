@@ -154,7 +154,7 @@ section 배분:
 ❷ empathy — 공감 (부모 마음을 잡는 공감, "많은 부모님들이 괜찮다고 생각하지만...")
 ❸ twist — 반전 (행동→뇌/신경계로 관점 전환, "문제는 행동이 아니라 뇌 상태입니다")
 ❹ core — 핵심 설명 (신경계/뇌과학 근거의 쉬운 설명, 그림처럼 설명)
-❺ solution — 해결책 (BEFORE→AFTER, 바로 따라할 수 있게)
+❺ solution — 해결책 (바로 따라할 수 있는 구체적 실천법)
 ❻ cta — CTA (아래 [CTA 가이드] 의 지정 스타일을 따를 것)
 
 section 배분 가이드:
@@ -245,6 +245,13 @@ ${buildPrevVideosContext()}
 6. 공감 문장 작성 — 부모가 "맞아, 우리 아이도..."라고 느낄 문장
 7. 반전 문장 작성 — "사실 이건 행동이 아니라 신경계/뇌 문제"라는 관점 전환
 
+⚠️ 공감 문장 작성 시 금지 표현 — 매 영상마다 반복되어 식상해진 상투어입니다. 절대 사용 금지:
+- "내가 뭘 잘못하고 있는건가", "자책하셨죠", "자책하셨을 거예요", "나 때문인가 싶으셨죠"
+- "많은 부모님들이 ○○하셨을 거예요", "부모님들 많이 겪으시는..."
+- "밤마다 ○○하며 고민하셨죠", "잠 못 이루며 자책하셨죠"
+- 기타 "○○하셨죠/하셨을 거예요" 로 끝나는 뻔한 공감 유도 오프닝
+→ 대신: 구체적 장면·상황 묘사로 시작 (예: "저녁 8시, 아이가 또 소리를 지르기 시작합니다" / "어린이집 선생님 문자를 받은 날입니다"). 일반화·공감호소 표현이 아니라, 실제 부모가 마주하는 한 장면을 구체적으로 그려주세요.
+
 JSON으로 출력:
 {
   "cot_log": "위 사고 과정 전체 요약",
@@ -316,6 +323,12 @@ ${structureGuide}
 
 ${pickCtaGuide()}
 
+[⚠️ empathy(공감) 섹션 작성 규칙 — 매 영상마다 반복되는 상투어 금지]
+- 금지 표현: "내가 뭘 잘못하고 있는건가", "자책하셨죠", "자책하셨을 거예요", "나 때문인가 싶으셨죠", "많은 부모님들이 ○○하셨을 거예요", "밤마다 고민하며 자책하셨죠"
+- 금지 패턴: "~하셨죠/하셨을 거예요" 로 끝나는 뻔한 공감 유도 오프닝, 일반화·공감호소 표현
+- 대체 방법: 구체적 장면·상황 묘사로 시작 (예: "저녁 8시, 아이가 또 바닥에 주저앉습니다" / "어린이집 선생님의 전화가 온 날이었습니다" / "밥상 앞에서 숟가락을 던지는 아이를 보며…")
+- empathy는 "이런 적 있으시죠"라고 호소하지 말고, 부모가 마주하는 실제 한 장면을 영화처럼 묘사하세요.
+
 [⚠️ 분량 기준 — 반드시 지켜야 합니다]
 - 목표 영상 길이: ${lengthGuide.time}
 - 한국어 나레이션 기준 약 300자 = 1분
@@ -345,7 +358,7 @@ JSON이 아닙니다. 일반 텍스트로 자연스럽게 써주세요.
 (핵심 설명 — 전체의 35%, 비유와 예시를 풍부하게)
 
 ===SECTION:solution===
-(해결책 — 전체의 25%, BEFORE/AFTER 포함, 구체적 실천법)
+(해결책 — 전체의 25%, 바로 적용 가능한 구체적 실천법, 단계별 방법)
 
 ===SECTION:cta===
 (CTA + 마무리 인사)
@@ -428,6 +441,12 @@ ${buildPrevVideosContext()}
 ${structureGuide}
 
 ${pickCtaGuide()}
+
+[⚠️ empathy(공감) 섹션 작성 규칙 — 매 영상마다 반복되는 상투어 금지]
+- 금지 표현: "내가 뭘 잘못하고 있는건가", "자책하셨죠", "자책하셨을 거예요", "나 때문인가 싶으셨죠", "많은 부모님들이 ○○하셨을 거예요", "밤마다 고민하며 자책하셨죠"
+- 금지 패턴: "~하셨죠/하셨을 거예요" 로 끝나는 뻔한 공감 유도 오프닝, 일반화·공감호소 표현
+- 대체 방법: 구체적 장면·상황 묘사로 시작 (예: "저녁 8시, 아이가 또 바닥에 주저앉습니다" / "어린이집 선생님의 전화가 온 날이었습니다")
+- empathy는 "이런 적 있으시죠"라고 호소하지 말고, 부모가 마주하는 실제 한 장면을 영화처럼 묘사하세요.
 
 [분량 기준 — 매우 중요! 반드시 지켜야 합니다]
 - 목표 영상 길이: ${lengthGuide.time}
@@ -824,6 +843,21 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
     }
   };
 
+  const resetToModeSelection = () => {
+    setMode(null);
+    setCurrentStep(0);
+    setError('');
+    setStreamText('');
+    setManualStep(1);
+    setManualInput('');
+    setManualHookResult(null);
+    setManualProseText('');
+    setManualRowsPart1(null);
+    setManualRowsResult(null);
+    setManualError('');
+    updateState('script', { ...globalScript, final_hook: null, rows: [] });
+  };
+
   const updateRowField = (idx, field, value) => {
     const newRows = [...globalScript.rows];
     newRows[idx] = { ...newRows[idx], [field]: value };
@@ -993,7 +1027,7 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
     <div className="panel-card" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 className="panel-title" style={{ margin: 0 }}>완성된 대본</h2>
-        <button className="btn-secondary" onClick={generateAll}><RefreshCw size={16}/> 전체 재생성</button>
+        <button className="btn-secondary" onClick={resetToModeSelection}><RefreshCw size={16}/> 전체 재생성</button>
       </div>
 
       {/* 훅·공감·반전 기획 카드 */}
