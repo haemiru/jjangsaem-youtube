@@ -185,7 +185,7 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
     : `연관 전자책: ${plan.ebookName}\n전자책 요약본: ${plan.ebookSummary || '(없음)'}`;
   const sourceOutroLabel = isTopicMode
     ? `연계 페이지: 짱샘의 책방 (${JJANGSAEM_URL}) — 영상 마지막 CTA에 구독·책방 방문 유도를 자연스럽게 포함 (매 영상마다 다른 문구로)`
-    : `${sourceOutroLabel}`;
+    : `연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)`;
 
   const structureGuide = isShorts
     ? `[쇼츠 4단계 구조 — 반드시 이 순서대로 작성]
