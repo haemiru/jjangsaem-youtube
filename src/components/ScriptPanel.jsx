@@ -117,12 +117,6 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
         ...baseCtaStylePool,
         { name: '전자책연결형', desc: `"더 깊은 내용은 전자책 『${plan.ebookName}』에서 확인하세요" 처럼, 전자책으로 자연스럽게 연결` },
       ];
-  const subscribeLineVariants = [
-    '도움이 되셨다면 구독과 좋아요 부탁드려요',
-    '구독해두시면 다음 영상을 놓치지 않아요',
-    '좋아요 한 번이 더 많은 부모님께 닿게 해줍니다',
-    '구독하시면 매주 새로운 양육 인사이트를 받아보실 수 있어요',
-  ];
   const bookstoreLineVariants = [
     '더 깊은 이야기는 짱샘의 책방(jjangsaem.com)에서 이어집니다. 구독도 꾹 눌러주시면 힘이 돼요',
     '이 주제에 관한 자료는 짱샘의 책방에 더 정리돼 있어요. 구독하시고, 책방도 한번 들러보세요',
@@ -140,9 +134,6 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
   const pickCtaGuide = () => {
     const shuffled = [...ctaStylePool].sort(() => Math.random() - 0.5);
     const picks = shuffled.slice(0, isShorts ? 1 : 2);
-    // topic 모드에서는 구독+책방 유도를 항상 포함 (다양한 문구로)
-    const includeSubscribe = isTopicMode ? true : Math.random() < (isShorts ? 0.35 : 0.5);
-    const subscribeLine = subscribeLineVariants[Math.floor(Math.random() * subscribeLineVariants.length)];
     const shuffledBookstore = [...bookstoreLineVariants].sort(() => Math.random() - 0.5);
     const bookstoreSamples = shuffledBookstore.slice(0, 3);
 
@@ -152,23 +143,17 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
       ...picks.map((p, i) => `  ${i + 1}) ${p.name} — ${p.desc}`),
     ];
 
-    if (isTopicMode) {
-      lines.push(
-        '',
-        '[필수] 이번 영상은 "주제 기반 기획"이므로, CTA 안에 반드시 다음 두 요소를 자연스럽게 녹여 넣으세요:',
-        '  1) 채널 구독 유도',
-        '  2) 짱샘의 책방(jjangsaem.com) 방문 유도 — 더 자세한 자료/심화 내용이 책방에 있다는 맥락으로',
-        '표현은 매번 달라야 합니다. 아래는 참고용 예시 3개이며, 그대로 복사하지 말고 이번 영상 톤과 주제에 맞게 새롭게 재작성하세요:',
-        ...bookstoreSamples.map((l, i) => `  - 예시 ${i + 1}: "${l}"`),
-        '⚠️ "짱샘의 책방에 방문해주세요" 같은 건조하고 똑같은 문장을 반복하지 마세요. 영상 주제/핵심 내용과 자연스럽게 이어지는 한 문장을 새로 지어내세요.',
-      );
-    } else if (includeSubscribe) {
-      lines.push(
-        `또한 CTA 안에 구독·좋아요 멘트를 자연스럽게 한 줄 포함하세요. 예시 톤: "${subscribeLine}" (예시 그대로 쓰지 말고 영상 톤에 맞게 변형)`,
-      );
-    } else {
-      lines.push('이번 영상은 구독·좋아요 멘트는 생략하고, 위 스타일에만 집중하세요.');
-    }
+    // 모든 모드에서 "짱샘의 책방" 유입 유도를 항상 포함 (채널의 핵심 목표)
+    lines.push(
+      '',
+      '[필수] CTA 안에 반드시 다음 두 요소를 자연스럽게 녹여 넣으세요 — 이 채널의 최종 목적은 "짱샘의 책방" 유입입니다:',
+      '  1) 채널 구독 유도',
+      '  2) 짱샘의 책방(jjangsaem.com) 방문 유도 — "더 자세한 내용 / 더 많은 ○○이 궁금하시면 짱샘의 책방에서 확인하실 수 있어요" 같은 맥락으로, 이 영상에서 짧게 다룬 부분의 심화/추가 자료가 책방에 있다는 톤',
+      `표현은 매번 달라야 합니다. 아래는 참고용 예시 3개이며, 그대로 복사하지 말고 이번 영상 주제(${plan?.topic || '현재 주제'})와 본문 톤에 맞게 새로운 한 문장으로 재작성하세요:`,
+      ...bookstoreSamples.map((l, i) => `  - 예시 ${i + 1}: "${l}"`),
+      '⚠️ "짱샘의 책방에 방문해주세요" 같은 건조하고 똑같은 문장을 반복하지 마세요. 본문에서 다룬 핵심 키워드를 한 번 더 녹여서 "이 부분이 더 궁금하시면 ~"처럼 자연스럽게 연결하세요.',
+      '⚠️ 책방 유도는 "심화/추가 자료" 맥락이어야 합니다. "이 영상은 일부만 다뤘고 더 깊은 내용은 책방에" 같은 흐름이 가장 자연스럽습니다.',
+    );
 
     lines.push(
       '⚠️ 다음 표현은 사용 금지: "이건 꼭 부모님이 알아야 합니다", "유용하면 저장하세요", "주변 부모님께 공유해주세요", "이 영상을 저장해두세요", "저장해두고 다시 보세요" (똑같은 문장 그대로). 같은 의도라도 새로운 표현으로 바꿔 쓸 것.',
@@ -185,7 +170,7 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
     : `연관 전자책: ${plan.ebookName}\n전자책 요약본: ${plan.ebookSummary || '(없음)'}`;
   const sourceOutroLabel = isTopicMode
     ? `연계 페이지: 짱샘의 책방 (${JJANGSAEM_URL}) — 영상 마지막 CTA에 구독·책방 방문 유도를 자연스럽게 포함 (매 영상마다 다른 문구로)`
-    : `연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)`;
+    : `연계 전자책: ${plan.ebookName} (영상 본문에서 자연스럽게 언급)\n최종 유입 목적지: 짱샘의 책방 (${JJANGSAEM_URL}) — 영상 마지막 CTA에서 구독 + 책방 방문을 매번 다른 문구로 유도`;
 
   const structureGuide = isShorts
     ? `[쇼츠 4단계 구조 — 반드시 이 순서대로 작성]
