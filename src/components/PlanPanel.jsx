@@ -1,20 +1,43 @@
 import React, { useState } from 'react';
-import { ArrowRight, Loader2, CheckCircle2, Circle, PlayCircle } from 'lucide-react';
+import { ArrowRight, Loader2, CheckCircle2, Circle, PlayCircle, BookOpen, Search } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 import { fetchWithRetry } from '../utils/fetchWithRetry';
 
+const JJANGSAEM_BOOKSTORE_URL = 'https://jjangsaem.com';
+
 export default function PlanPanel({ globalState, updateState, onNext }) {
   const data = globalState.plan;
   const seriesPlan = globalState.seriesPlan;
+  const mode = data.mode || 'ebook';
   const [localFile, setLocalFile] = useState(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isGeneratingSeries, setIsGeneratingSeries] = useState(false);
   const [summaryError, setSummaryError] = useState('');
   const [seriesError, setSeriesError] = useState('');
+  const [topicSeed, setTopicSeed] = useState('');
 
   const handleChange = (key, value) => {
     updateState('plan', { ...data, [key]: value });
+  };
+
+  const switchMode = (nextMode) => {
+    if (nextMode === mode) return;
+    const next = { ...data, mode: nextMode };
+    if (nextMode === 'topic') {
+      next.ebookUrl = JJANGSAEM_BOOKSTORE_URL;
+      next.ebookName = '';
+      next.ebookSummary = '';
+      setLocalFile(null);
+    } else {
+      if (data.ebookUrl === JJANGSAEM_BOOKSTORE_URL) {
+        next.ebookUrl = '';
+      }
+    }
+    updateState('plan', next);
+    updateState('seriesPlan', { ebookName: '', items: [] });
+    setSeriesError('');
+    setSummaryError('');
   };
 
   const handleTargetToggle = (target) => {
@@ -47,6 +70,150 @@ export default function PlanPanel({ globalState, updateState, onNext }) {
       fullText += textContent.items.map(item => item.str).join(' ') + '\n';
     }
     return fullText;
+  };
+
+  // Generate series plan from topic (research-based, no ebook)
+  const generateSeriesPlanFromTopic = async () => {
+    const seed = (topicSeed || '').trim();
+    if (!seed) {
+      setSeriesError('주제를 입력해주세요.');
+      return;
+    }
+
+    setIsGeneratingSeries(true);
+    setSeriesError('');
+
+    try {
+      const prompt = `다음은 유튜브 채널 "키즈피지오"에서 다룰 주제입니다.
+이 주제에 관한 최신 학술 연구(논문), 교과서, 전문 서적의 지식을 폭넓게 동원하여 유튜브 영상 시리즈를 기획해주세요.
+
+[주제]
+${seed}
+
+[채널 컨셉]
+"아이 행동을 고치는 채널이 아니라, 아이의 '신경계'를 이해하는 채널"
+차별점: 다른 채널은 행동 설명에 그치지만, 이 채널은 신경계 설명 + 해결까지 제시
+
+[이번 기획의 특수성 — 전자책이 아닌 주제 기반]
+- 특정 전자책이 아니라 주제 전반의 "전문 지식 풀" 에서 근거를 가져옵니다.
+- 각 영상의 focus에는 어떤 연구 분야/이론/저자/핵심 개념을 참고할지 구체적으로 적으세요 (예: "Porges의 다미주 신경 이론 중 사회 관여 시스템 파트", "감각통합 이론 (Ayres) — 전정 감각 조절 영역", "특정 학술지에서 보고된 수면-각성 리듬 연구").
+- 영상 하단 CTA에서는 "짱샘의 책방(jjangsaem.com)"으로 추가 자료를 안내할 예정이니, 각 영상이 "더 알고 싶어지는" 구조가 되도록 기획하세요.
+
+[목표]
+- 영상을 통해 해당 주제의 과학적 이해를 전달
+- 각 영상은 주제의 핵심 내용 일부만 다루고, 더 깊이 알고 싶으면 책방을 찾도록 자연스럽게 유도
+
+[요청 — 반드시 두 종류 모두 생성할 것]
+★ 롱폼 영상 (일반 8~10분) — 반드시 3개
+  - 주제를 3개의 큰 각도로 나누어 각각 1개씩 (예: ① 원인/메커니즘, ② 발달/임상적 함의, ③ 실천적 개입)
+  - format 값은 반드시 "일반 8~10분"
+
+★ 쇼츠 (15~30초) — 반드시 5개
+  - 주제의 서로 다른 세부 포인트 5개 (오해/사실 / 한 줄 팁 / 뜻밖의 연구 결과 / 흔한 사례 / 짧은 체크리스트 등)
+  - format 값은 반드시 "쇼츠 15~30초"
+
+총 8개 항목. 롱폼 3개, 쇼츠 5개. 반드시 정확히 이 개수로 생성.
+
+[가장 중요한 원칙 — 내용 중복 금지]
+- 각 영상은 주제의 "서로 다른 측면"만 집중적으로 다뤄야 합니다.
+- 롱폼 3개는 주제를 3등분하듯 각자 맡은 영역만 깊이 다루고, 다른 롱폼이 맡은 영역은 언급만 하고 건드리지 않습니다.
+- 쇼츠 5개도 서로 다른 포인트/사실/팁 하나씩만.
+
+각 항목에는 반드시 "focus" 필드를 포함하세요. 이 필드는 해당 영상이 참고할 구체적 학술적 범위(이론명, 연구 분야, 개념, 저자)를 명시합니다. 나중에 대본 작성 시 이 범위 밖의 내용은 사용하지 않습니다.
+
+각 제목은 유튜브에서 클릭을 유발하는 형태로.
+
+JSON으로 출력:
+{
+  "items": [
+    { "title": "영상 제목", "format": "일반 8~10분", "focus": "참고할 학술 범위 — 이론명/저자/연구 분야 구체적으로", "desc": "이 영상에서 다룰 핵심 내용 1줄 요약" },
+    { "title": "쇼츠 제목", "format": "쇼츠 15~30초", "focus": "이 쇼츠가 참고할 구체적 사실/연구", "desc": "핵심 포인트 1줄" }
+  ]
+}
+JSON만 출력.`;
+
+      const res = await fetchWithRetry('/api/anthropic/v1/messages', {
+        method: 'POST',
+        headers: {
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: data.model || "claude-haiku-4-5-20251001",
+          max_tokens: 4000,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+
+      if (!res.ok) throw new Error('시리즈 생성 API 호출 실패');
+      const apiData = await res.json();
+      const text = apiData.content[0].text;
+
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('JSON 파싱 실패');
+      const parsed = JSON.parse(match[0]);
+
+      const items = (parsed.items || []).map(item => ({
+        ...item,
+        status: 'pending'
+      }));
+
+      updateState('plan', { ...data, mode: 'topic', ebookName: `주제: ${seed}`, ebookUrl: JJANGSAEM_BOOKSTORE_URL });
+      updateState('seriesPlan', { ebookName: `주제: ${seed}`, items });
+
+    } catch (err) {
+      console.error(err);
+      setSeriesError('시리즈 생성 중 오류: ' + err.message);
+    } finally {
+      setIsGeneratingSeries(false);
+    }
+  };
+
+  // Summarize topic knowledge for current video focus (research-based)
+  const summarizeKnowledgeForTopic = async (topic, focus = '') => {
+    setIsSummarizing(true);
+    setSummaryError('');
+
+    try {
+      const focusBlock = focus
+        ? `\n[이 영상이 집중할 학술 범위]\n${focus}\n`
+        : '';
+
+      const prompt = `다음 주제에 관한 최신 학술 연구(논문), 교과서, 전문 서적의 지식을 종합하여, 유튜브 대본 작성에 필요한 핵심 정보를 정리해주세요.
+
+[영상 주제]
+${topic}
+${focusBlock}
+요구사항:
+- 위 "집중 범위"를 벗어나는 일반론은 넣지 말고, 지정된 범위에 해당하는 구체 내용만 깊이 있게 정리하세요.
+- 가능하면 구체적 연구자 이름, 이론명, 주요 개념, 수치/통계, 임상 사례 등을 포함해주세요.
+- 부모·비전문가가 이해할 수 있는 수준의 쉬운 설명도 함께 준비해주세요.
+- 1000자 이내로 압축.
+
+(이 요약본은 이후 대본 작성 프롬프트로 전달됩니다.)`;
+
+      const res = await fetchWithRetry('/api/anthropic/v1/messages', {
+        method: 'POST',
+        headers: {
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 1500,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+
+      if (!res.ok) throw new Error('Claude 요약 API 호출 실패');
+      const apiData = await res.json();
+      handleChange('ebookSummary', apiData.content[0].text);
+    } catch (err) {
+      console.error(err);
+      setSummaryError('요약 중 오류: ' + err.message);
+    } finally {
+      setIsSummarizing(false);
+    }
   };
 
   // Generate series plan from ebook
@@ -204,7 +371,9 @@ ${pdfText.substring(0, 20000)}`;
     updateState('plan', { ...data, topic: item.title, format: defaultFormat });
 
     // Auto-summarize for this topic — pass focus so the summary narrows to the item's assigned range
-    if (localFile) {
+    if (mode === 'topic') {
+      summarizeKnowledgeForTopic(item.title, item.focus || item.desc || '');
+    } else if (localFile) {
       summarizeForTopic(item.title, item.focus || item.desc || '');
     }
   };
@@ -218,57 +387,150 @@ ${pdfText.substring(0, 20000)}`;
     <div className="panel-card">
       <h2 className="panel-title">기획 설정</h2>
 
-      {/* Step 1: Ebook Upload */}
-      <div className="form-group" style={{ padding: '1.25rem', border: '2px solid var(--primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--secondary)' }}>
-        <label className="form-label" style={{ color: 'var(--primary)', fontSize: '1rem' }}>1. 전자책 PDF 업로드</label>
-        <p style={{ fontSize: '0.875rem', marginBottom: '0.75rem', color: 'var(--text-muted)' }}>
-          전자책을 업로드하면 AI가 내용을 분석하여 영상 시리즈를 자동 기획합니다.
-        </p>
-        <input
-          type="file"
-          accept="application/pdf"
-          className="form-control"
-          onChange={handleFileChange}
-        />
-        {data.ebookName && (
-          <div style={{ marginTop: '0.75rem', fontSize: '0.875rem', fontWeight: 600 }}>
-            업로드된 파일: {data.ebookName}
-          </div>
-        )}
+      {/* Step 1: Mode Selection */}
+      <div className="form-group" style={{ display: 'flex', gap: '0.5rem' }}>
+        <button
+          type="button"
+          onClick={() => switchMode('ebook')}
+          style={{
+            flex: 1, padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+            border: mode === 'ebook' ? '2px solid var(--primary)' : '1px solid var(--border)',
+            background: mode === 'ebook' ? 'var(--secondary)' : 'var(--surface)',
+            color: mode === 'ebook' ? 'var(--primary)' : 'var(--text)',
+            fontWeight: mode === 'ebook' ? 700 : 500,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+          }}
+        >
+          <BookOpen size={18} /> 전자책 기반 기획
+        </button>
+        <button
+          type="button"
+          onClick={() => switchMode('topic')}
+          style={{
+            flex: 1, padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+            border: mode === 'topic' ? '2px solid var(--primary)' : '1px solid var(--border)',
+            background: mode === 'topic' ? 'var(--secondary)' : 'var(--surface)',
+            color: mode === 'topic' ? 'var(--primary)' : 'var(--text)',
+            fontWeight: mode === 'topic' ? 700 : 500,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+          }}
+        >
+          <Search size={18} /> 주제 기반 기획 (논문·전문서적)
+        </button>
+      </div>
 
-        <div style={{ marginTop: '0.75rem' }}>
-          <label className="form-label" style={{ fontSize: '0.875rem', color: 'var(--primary)' }}>전자책 구매 페이지 URL</label>
-          <input
-            type="url"
-            className="form-control"
-            value={data.ebookUrl || ''}
-            onChange={(e) => handleChange('ebookUrl', e.target.value)}
-            placeholder="예: https://jjangsaem.com/ebook/sensory-sleep"
-          />
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-            유튜브 디스크립션에 전자책 링크로 삽입됩니다.
+      {/* Step 2: Ebook Upload (ebook mode) */}
+      {mode === 'ebook' && (
+        <div className="form-group" style={{ padding: '1.25rem', border: '2px solid var(--primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--secondary)' }}>
+          <label className="form-label" style={{ color: 'var(--primary)', fontSize: '1rem' }}>전자책 PDF 업로드</label>
+          <p style={{ fontSize: '0.875rem', marginBottom: '0.75rem', color: 'var(--text-muted)' }}>
+            전자책을 업로드하면 AI가 내용을 분석하여 영상 시리즈를 자동 기획합니다.
           </p>
-        </div>
+          <input
+            type="file"
+            accept="application/pdf"
+            className="form-control"
+            onChange={handleFileChange}
+          />
+          {data.ebookName && (
+            <div style={{ marginTop: '0.75rem', fontSize: '0.875rem', fontWeight: 600 }}>
+              업로드된 파일: {data.ebookName}
+            </div>
+          )}
 
-        {/* Series Generation Button — always show when ebook name exists */}
-        {data.ebookName && (
+          <div style={{ marginTop: '0.75rem' }}>
+            <label className="form-label" style={{ fontSize: '0.875rem', color: 'var(--primary)' }}>전자책 구매 페이지 URL</label>
+            <input
+              type="url"
+              className="form-control"
+              value={data.ebookUrl || ''}
+              onChange={(e) => handleChange('ebookUrl', e.target.value)}
+              placeholder="예: https://jjangsaem.com/ebook/sensory-sleep"
+            />
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              유튜브 디스크립션에 전자책 링크로 삽입됩니다.
+            </p>
+          </div>
+
+          {data.ebookName && (
+            <div style={{ marginTop: '1rem' }}>
+              {!localFile && (
+                <p style={{ fontSize: '0.8125rem', color: '#d97706', marginBottom: '0.5rem' }}>
+                  PDF 파일을 다시 선택해주세요 (페이지 새로고침 시 파일이 초기화됩니다).
+                </p>
+              )}
+              {!hasSeries && (
+                <button
+                  className="btn-primary"
+                  onClick={generateSeriesPlan}
+                  disabled={isGeneratingSeries || !localFile}
+                  style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', opacity: (!localFile && !isGeneratingSeries) ? 0.5 : 1 }}
+                >
+                  {isGeneratingSeries ? (
+                    <><Loader2 className="animate-spin" size={18} /> 전자책 분석 및 시리즈 기획 중...</>
+                  ) : (
+                    '전자책 분석하여 영상 시리즈 기획하기'
+                  )}
+                </button>
+              )}
+              {hasSeries && (
+                <button
+                  className="btn-secondary"
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.875rem' }}
+                  onClick={generateSeriesPlan}
+                  disabled={isGeneratingSeries || !localFile}
+                >
+                  {isGeneratingSeries ? <><Loader2 className="animate-spin" size={14} /> 시리즈 재생성 중...</> : '시리즈 재생성'}
+                </button>
+              )}
+            </div>
+          )}
+          {seriesError && <div style={{ color: 'red', fontSize: '0.875rem', marginTop: '0.5rem' }}>{seriesError}</div>}
+        </div>
+      )}
+
+      {/* Step 2: Topic Seed (topic mode) */}
+      {mode === 'topic' && (
+        <div className="form-group" style={{ padding: '1.25rem', border: '2px solid var(--primary)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--secondary)' }}>
+          <label className="form-label" style={{ color: 'var(--primary)', fontSize: '1rem' }}>주제 입력</label>
+          <p style={{ fontSize: '0.875rem', marginBottom: '0.75rem', color: 'var(--text-muted)' }}>
+            특정 주제를 입력하면 AI가 관련 논문·전문서적 지식을 동원해 영상 시리즈를 기획합니다.
+            CTA에서는 "짱샘의 책방 방문 + 구독"을 다양한 문구로 유도합니다.
+          </p>
+          <textarea
+            className="form-control"
+            value={topicSeed}
+            onChange={(e) => setTopicSeed(e.target.value)}
+            placeholder="예: 자폐 스펙트럼 아동의 감각 조절 — 전정 감각과 고유 수용성 감각이 수면에 미치는 영향"
+            rows={2}
+          />
+
+          <div style={{ marginTop: '0.75rem' }}>
+            <label className="form-label" style={{ fontSize: '0.875rem', color: 'var(--primary)' }}>연결 URL (자동 고정)</label>
+            <input
+              type="url"
+              className="form-control"
+              value={data.ebookUrl || JJANGSAEM_BOOKSTORE_URL}
+              readOnly
+              style={{ backgroundColor: 'var(--gray-100)', color: 'var(--text-muted)' }}
+            />
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              주제 기반 모드에서는 짱샘의 책방({JJANGSAEM_BOOKSTORE_URL})이 CTA·디스크립션에 자동으로 삽입됩니다.
+            </p>
+          </div>
+
           <div style={{ marginTop: '1rem' }}>
-            {!localFile && (
-              <p style={{ fontSize: '0.8125rem', color: '#d97706', marginBottom: '0.5rem' }}>
-                PDF 파일을 다시 선택해주세요 (페이지 새로고침 시 파일이 초기화됩니다).
-              </p>
-            )}
             {!hasSeries && (
               <button
                 className="btn-primary"
-                onClick={generateSeriesPlan}
-                disabled={isGeneratingSeries || !localFile}
-                style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', opacity: (!localFile && !isGeneratingSeries) ? 0.5 : 1 }}
+                onClick={generateSeriesPlanFromTopic}
+                disabled={isGeneratingSeries || !topicSeed.trim()}
+                style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', opacity: (!topicSeed.trim() && !isGeneratingSeries) ? 0.5 : 1 }}
               >
                 {isGeneratingSeries ? (
-                  <><Loader2 className="animate-spin" size={18} /> 전자책 분석 및 시리즈 기획 중...</>
+                  <><Loader2 className="animate-spin" size={18} /> 주제 분석 및 시리즈 기획 중...</>
                 ) : (
-                  '전자책 분석하여 영상 시리즈 기획하기'
+                  '주제 분석하여 영상 시리즈 기획하기'
                 )}
               </button>
             )}
@@ -276,16 +538,16 @@ ${pdfText.substring(0, 20000)}`;
               <button
                 className="btn-secondary"
                 style={{ width: '100%', padding: '0.5rem', fontSize: '0.875rem' }}
-                onClick={generateSeriesPlan}
-                disabled={isGeneratingSeries || !localFile}
+                onClick={generateSeriesPlanFromTopic}
+                disabled={isGeneratingSeries || !topicSeed.trim()}
               >
                 {isGeneratingSeries ? <><Loader2 className="animate-spin" size={14} /> 시리즈 재생성 중...</> : '시리즈 재생성'}
               </button>
             )}
           </div>
-        )}
-        {seriesError && <div style={{ color: 'red', fontSize: '0.875rem', marginTop: '0.5rem' }}>{seriesError}</div>}
-      </div>
+          {seriesError && <div style={{ color: 'red', fontSize: '0.875rem', marginTop: '0.5rem' }}>{seriesError}</div>}
+        </div>
+      )}
 
       {/* Step 2: Series Plan */}
       {hasSeries && (

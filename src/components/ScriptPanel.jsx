@@ -102,40 +102,90 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
   })();
 
   // CTA 다양화 — 매 생성마다 랜덤 스타일 1~2개 선택, 일정 확률로 구독/좋아요 멘트 포함
-  const ctaStylePool = [
+  const isTopicMode = plan.mode === 'topic';
+  const baseCtaStylePool = [
     { name: '공유형', desc: '"같은 고민하는 부모님께 공유해주세요" 처럼, 주변 부모에게 공유 유도 (단, 너무 식상한 표현은 피할 것)' },
     { name: '댓글질문형', desc: '"우리 아이는 어땠나요? 댓글로 알려주세요" 처럼, 시청자 경험을 댓글로 묻는 방식' },
     { name: '실천약속형', desc: '"오늘 밤부터 딱 한 가지만 시도해보세요" 처럼, 작은 실천 한 가지를 약속하게 만드는 방식' },
     { name: '다음영상예고형', desc: '"다음 영상에서는 ○○를 다룰 거예요. 놓치지 않으려면 구독해두세요" 처럼, 다음 콘텐츠를 예고하며 구독 유도' },
-    { name: '전자책연결형', desc: `"더 깊은 내용은 전자책 『${plan.ebookName}』에서 확인하세요" 처럼, 전자책으로 자연스럽게 연결` },
     { name: '경고환기형', desc: '"이 신호를 놓치면 ○○로 이어질 수 있어요" 처럼, 놓쳤을 때의 손실을 한 번 더 환기' },
     { name: '인사이트요약형', desc: '"오늘 기억할 단 한 문장은 ○○입니다" 처럼, 핵심을 한 문장으로 각인시키는 방식' },
   ];
+  const ctaStylePool = isTopicMode
+    ? baseCtaStylePool
+    : [
+        ...baseCtaStylePool,
+        { name: '전자책연결형', desc: `"더 깊은 내용은 전자책 『${plan.ebookName}』에서 확인하세요" 처럼, 전자책으로 자연스럽게 연결` },
+      ];
   const subscribeLineVariants = [
     '도움이 되셨다면 구독과 좋아요 부탁드려요',
     '구독해두시면 다음 영상을 놓치지 않아요',
     '좋아요 한 번이 더 많은 부모님께 닿게 해줍니다',
     '구독하시면 매주 새로운 양육 인사이트를 받아보실 수 있어요',
   ];
+  const bookstoreLineVariants = [
+    '더 깊은 이야기는 짱샘의 책방(jjangsaem.com)에서 이어집니다. 구독도 꾹 눌러주시면 힘이 돼요',
+    '이 주제에 관한 자료는 짱샘의 책방에 더 정리돼 있어요. 구독하시고, 책방도 한번 들러보세요',
+    '궁금한 분들을 위해 짱샘의 책방(jjangsaem.com)에 관련 자료를 모아뒀어요. 구독도 잊지 말아주세요',
+    '오늘 다 못 담은 내용은 짱샘의 책방에서 확인하실 수 있어요. 영상은 구독으로 챙겨주세요',
+    '영상으로 얼추 감 잡으셨다면, 다음 단계는 짱샘의 책방(jjangsaem.com)이에요. 구독하고 함께 가요',
+    '짱샘의 책방에 더 자세한 자료가 있으니 꼭 한번 방문해보시고, 채널도 구독해두세요',
+    '이 내용이 도움이 되셨다면, 구독과 함께 짱샘의 책방(jjangsaem.com)에서 더 깊은 이야기를 만나보세요',
+    '짱샘의 책방에는 이 영상에서 짧게 다룬 부분을 구체 사례로 풀어놓은 자료가 있어요. 구독도 부탁드립니다',
+    '영상만으론 아쉬우셨다면 짱샘의 책방(jjangsaem.com)으로 와주세요. 구독하시면 새 영상도 바로 알려드려요',
+    '더 자세한 설명이 필요하시면 짱샘의 책방에서 확인해보세요. 채널 구독은 큰 응원이 됩니다',
+    '이런 주제가 마음에 드신다면 구독해두시고, 짱샘의 책방(jjangsaem.com)에도 꼭 한 번 들러주세요',
+    '짱샘의 책방에 오늘 못다한 세부 자료를 올려두었어요. 채널 구독과 함께 확인해보시길 권해요',
+  ];
   const pickCtaGuide = () => {
     const shuffled = [...ctaStylePool].sort(() => Math.random() - 0.5);
     const picks = shuffled.slice(0, isShorts ? 1 : 2);
-    const includeSubscribe = Math.random() < (isShorts ? 0.35 : 0.5);
+    // topic 모드에서는 구독+책방 유도를 항상 포함 (다양한 문구로)
+    const includeSubscribe = isTopicMode ? true : Math.random() < (isShorts ? 0.35 : 0.5);
     const subscribeLine = subscribeLineVariants[Math.floor(Math.random() * subscribeLineVariants.length)];
+    const shuffledBookstore = [...bookstoreLineVariants].sort(() => Math.random() - 0.5);
+    const bookstoreSamples = shuffledBookstore.slice(0, 3);
+
     const lines = [
       '[CTA 가이드 — 매번 다른 패턴으로 작성하기 위한 지정 스타일]',
       `이번 대본의 CTA는 다음 ${picks.length}개 스타일을 조합해서 작성하세요:`,
       ...picks.map((p, i) => `  ${i + 1}) ${p.name} — ${p.desc}`),
-      includeSubscribe
-        ? `또한 CTA 안에 구독·좋아요 멘트를 자연스럽게 한 줄 포함하세요. 예시 톤: "${subscribeLine}" (예시 그대로 쓰지 말고 영상 톤에 맞게 변형)`
-        : '이번 영상은 구독·좋아요 멘트는 생략하고, 위 스타일에만 집중하세요.',
+    ];
+
+    if (isTopicMode) {
+      lines.push(
+        '',
+        '[필수] 이번 영상은 "주제 기반 기획"이므로, CTA 안에 반드시 다음 두 요소를 자연스럽게 녹여 넣으세요:',
+        '  1) 채널 구독 유도',
+        '  2) 짱샘의 책방(jjangsaem.com) 방문 유도 — 더 자세한 자료/심화 내용이 책방에 있다는 맥락으로',
+        '표현은 매번 달라야 합니다. 아래는 참고용 예시 3개이며, 그대로 복사하지 말고 이번 영상 톤과 주제에 맞게 새롭게 재작성하세요:',
+        ...bookstoreSamples.map((l, i) => `  - 예시 ${i + 1}: "${l}"`),
+        '⚠️ "짱샘의 책방에 방문해주세요" 같은 건조하고 똑같은 문장을 반복하지 마세요. 영상 주제/핵심 내용과 자연스럽게 이어지는 한 문장을 새로 지어내세요.',
+      );
+    } else if (includeSubscribe) {
+      lines.push(
+        `또한 CTA 안에 구독·좋아요 멘트를 자연스럽게 한 줄 포함하세요. 예시 톤: "${subscribeLine}" (예시 그대로 쓰지 말고 영상 톤에 맞게 변형)`,
+      );
+    } else {
+      lines.push('이번 영상은 구독·좋아요 멘트는 생략하고, 위 스타일에만 집중하세요.');
+    }
+
+    lines.push(
       '⚠️ 다음 표현은 사용 금지: "이건 꼭 부모님이 알아야 합니다", "유용하면 저장하세요", "주변 부모님께 공유해주세요", "이 영상을 저장해두세요", "저장해두고 다시 보세요" (똑같은 문장 그대로). 같은 의도라도 새로운 표현으로 바꿔 쓸 것.',
       '⚠️ "저장" 유도 CTA는 절대 사용하지 마세요. 유튜브에서 저장을 유도하는 CTA는 부자연스럽습니다. 대신 구독, 좋아요, 댓글, 공유, 다음 영상 예고 등으로 유도하세요.',
       '⚠️ CTA는 단순 명령형이 아니라, 본문에서 다룬 핵심 내용과 자연스럽게 이어지도록 한 문장 이상의 맥락과 함께 작성하세요.',
       '⚠️ 대본의 맨 마지막 row는 반드시 마무리 인사로 끝낼 것. 예: "오늘도 시청해주셔서 감사합니다", "끝까지 함께해주셔서 감사해요", "다음 영상에서 또 만나요". 매번 표현은 다르게 변형. (구독·좋아요 멘트와는 별도의 row로 분리 가능)',
-    ];
+    );
     return lines.join('\n');
   };
+
+  const JJANGSAEM_URL = 'https://jjangsaem.com';
+  const sourceInfoBlock = isTopicMode
+    ? `기획 모드: 주제 기반 (논문·전문서적 지식 활용)\n연결 페이지: 짱샘의 책방 (${JJANGSAEM_URL})\n주제 지식 요약: ${plan.ebookSummary || '(없음)'}`
+    : `연관 전자책: ${plan.ebookName}\n전자책 요약본: ${plan.ebookSummary || '(없음)'}`;
+  const sourceOutroLabel = isTopicMode
+    ? `연계 페이지: 짱샘의 책방 (${JJANGSAEM_URL}) — 영상 마지막 CTA에 구독·책방 방문 유도를 자연스럽게 포함 (매 영상마다 다른 문구로)`
+    : `${sourceOutroLabel}`;
 
   const structureGuide = isShorts
     ? `[쇼츠 4단계 구조 — 반드시 이 순서대로 작성]
@@ -189,8 +239,7 @@ ${lines.join('\n')}\n`;
 포맷: ${plan.format}
 대상: ${plan.targets.join(', ')}
 톤: ${plan.tone}
-연관 전자책: ${plan.ebookName}
-전자책 요약본: ${plan.ebookSummary || '(없음)'}
+${sourceInfoBlock}
 벤치마킹 감정 트리거: ${benchmark.titleFormulas?.triggerWords?.join(', ') || '없음'}
 ${buildPrevVideosContext()}
 [쇼츠 영상 구조 — 4단계]
@@ -224,8 +273,7 @@ JSON만 출력.`
 포맷: ${plan.format}
 대상: ${plan.targets.join(', ')}
 톤: ${plan.tone}
-연관 전자책: ${plan.ebookName}
-전자책 요약본: ${plan.ebookSummary || '(없음)'}
+${sourceInfoBlock}
 벤치마킹 감정 트리거: ${benchmark.titleFormulas?.triggerWords?.join(', ') || '없음'}
 ${buildPrevVideosContext()}
 [바이럴 영상 공식 — 6단계 구조]
@@ -317,7 +365,7 @@ JSON만 출력.`;
 반전: ${hookResult.twist}
 
 포맷: ${plan.format}
-연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
+${sourceOutroLabel}
 ${buildPrevVideosContext()}
 ${structureGuide}
 
@@ -436,7 +484,7 @@ JSON만 출력. prompts 배열의 개수는 반드시 ${subset.length}개여야 
 반전: ${hookResult.twist}
 
 포맷: ${plan.format}
-연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
+${sourceOutroLabel}
 ${buildPrevVideosContext()}
 ${structureGuide}
 
@@ -495,7 +543,7 @@ JSON만 출력.`;
 훅: ${hookResult.final_hook.text}
 
 포맷: ${plan.format}
-연계 전자책: ${plan.ebookName} (영상 마지막에 자연스럽게 연결)
+${sourceOutroLabel}
 ${buildPrevVideosContext()}
 ${structureGuide}
 
@@ -1165,57 +1213,103 @@ JSON만 출력. 다른 텍스트 절대 금지.`;
         </div>
       </div>
 
-      {/* TTS Style Instructions */}
+      {/* Gemini TTS (AI Studio) — Scene / Sample Context */}
       {(() => {
-        const ttsStyles = {
-          '따뜻한': 'Speak in a warm, gentle, and empathetic tone, like a caring mother talking to worried parents. Soft and reassuring voice, moderate pace, with natural emotional pauses.',
-          '전문적': 'Speak in a calm, confident, and authoritative tone, like a pediatric neurologist explaining to parents. Clear articulation, steady pace, professional but approachable.',
-          '교육적': 'Speak in a friendly and clear instructional tone, like a kind teacher explaining step by step. Bright and encouraging voice, slightly slower pace for clarity.'
+        const shorts = plan.format.startsWith('쇼츠');
+
+        const scenePresets = {
+          '따뜻한': shorts
+            ? 'A compassionate parenting coach delivering a brief, heartfelt message to a weary parent who just paused their late-night scrolling. Intimate, one-on-one feel.'
+            : 'A compassionate parenting coach speaking one-on-one with an exhausted parent of a child with developmental challenges. Quiet evening setting, unhurried and attentive.',
+          '전문적': shorts
+            ? 'A pediatric sleep specialist delivering a single, high-value insight to a busy parent or clinician in a short clip. Calm, credible, efficient.'
+            : 'A pediatric sleep specialist presenting evidence-based guidance to parents and clinicians. Composed, authoritative, and measured.',
+          '교육적': shorts
+            ? 'A warm, experienced teacher sharing one clear, actionable tip with parents in a short clip. Bright, encouraging, unmistakably clear.'
+            : 'A warm, experienced teacher walking parents through a practical method step by step, like a small caregiver workshop.',
         };
-        const speedInstructions = {
-          '1x': '',
-          '1.2x': ' Speak at a slightly faster pace than normal, about 1.2x speed.',
-          '1.5x': ' Speak at a noticeably faster pace, about 1.5x speed. Keep clarity while increasing tempo.',
-          '2x': ' Speak at a very fast pace, about 2x speed. Maintain clear pronunciation despite the rapid delivery.'
+
+        const contextPresets = {
+          '따뜻한': shorts
+            ? 'The listener is a tired parent who just stumbled onto this clip. They need to feel seen in the first few seconds and walk away with one comforting takeaway.'
+            : 'The listener has been searching for answers about their child\'s sleep for a long time. They are emotionally drained and need warmth, reassurance, and zero judgment.',
+          '전문적': shorts
+            ? 'The listener is scanning quickly for credible information. Be authoritative but efficient — every sentence must earn its place.'
+            : 'The listener expects precise, trustworthy information and may be taking notes. Maintain clarity and steady authority throughout.',
+          '교육적': shorts
+            ? 'The listener wants a quick, practical takeaway they can try tonight. Keep the energy bright and the instruction unmistakably clear.'
+            : 'The listener is a motivated parent hearing this approach for the first time. They need clarity, encouragement, and confidence that they can apply it.',
         };
-        const baseStyle = ttsStyles[plan.tone] || ttsStyles['전문적'];
-        const styleText = baseStyle + (speedInstructions[ttsSpeedLabel] || '');
+
+        const paceHint = {
+          '1x': 'Steady, natural pace.',
+          '1.2x': 'Slightly brisk pace, about 1.2x a calm delivery.',
+          '1.5x': 'Brisk, energetic pace, about 1.5x a calm delivery — keep diction crisp.',
+          '2x': 'Very fast, urgent pace, about 2x a calm delivery — maintain clear pronunciation.',
+        };
+
+        const sceneText = scenePresets[plan.tone] || scenePresets['전문적'];
+        const contextText = `${contextPresets[plan.tone] || contextPresets['전문적']} ${paceHint[ttsSpeedLabel] || ''}`.trim();
         const speedOptions = ['1x', '1.2x', '1.5x', '2x'];
+
+        const fieldStyle = { padding: '0.75rem', backgroundColor: 'white', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem', fontFamily: 'monospace', lineHeight: '1.6', color: '#374151', whiteSpace: 'pre-wrap' };
+        const labelStyle = { fontSize: '0.8125rem', fontWeight: 600, color: '#1d4ed8', marginBottom: '0.375rem' };
+
         return (
-          <div style={{ border: '1px solid #3b82f6', borderRadius: 'var(--radius-md)', padding: '1.25rem', backgroundColor: '#eff6ff' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <div style={{ border: '1px solid #3b82f6', borderRadius: 'var(--radius-md)', padding: '1.25rem', backgroundColor: '#eff6ff', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1rem', margin: 0, color: '#1d4ed8' }}>
-                Google TTS Style Instructions ({plan.tone})
+                Gemini TTS (AI Studio) — {plan.tone} · {shorts ? '쇼츠' : '롱폼'}
               </h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', gap: '0.25rem' }}>
-                  {speedOptions.map(speed => (
-                    <button
-                      key={speed}
-                      onClick={() => setTtsSpeedLabel(speed)}
-                      style={{
-                        padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 600,
-                        border: ttsSpeedLabel === speed ? '2px solid #1d4ed8' : '1px solid #93c5fd',
-                        borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                        backgroundColor: ttsSpeedLabel === speed ? '#1d4ed8' : 'white',
-                        color: ttsSpeedLabel === speed ? 'white' : '#1d4ed8',
-                      }}
-                    >
-                      {speed}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  className="btn-primary"
-                  style={{ fontSize: '0.8125rem', padding: '0.375rem 0.75rem' }}
-                  onClick={() => copyText(styleText, 'tts_style')}
-                >
-                  {copiedId === 'tts_style' ? <><Check size={14}/> 복사됨</> : <><Copy size={14}/> 복사</>}
-                </button>
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                {speedOptions.map(speed => (
+                  <button
+                    key={speed}
+                    onClick={() => setTtsSpeedLabel(speed)}
+                    style={{
+                      padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 600,
+                      border: ttsSpeedLabel === speed ? '2px solid #1d4ed8' : '1px solid #93c5fd',
+                      borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                      backgroundColor: ttsSpeedLabel === speed ? '#1d4ed8' : 'white',
+                      color: ttsSpeedLabel === speed ? 'white' : '#1d4ed8',
+                    }}
+                  >
+                    {speed}
+                  </button>
+                ))}
               </div>
             </div>
-            <div style={{ padding: '0.75rem', backgroundColor: 'white', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem', fontFamily: 'monospace', lineHeight: '1.6', color: '#374151' }}>
-              {styleText}
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={labelStyle}>Scene</div>
+                <button
+                  className="btn-primary"
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }}
+                  onClick={() => copyText(sceneText, 'tts_scene')}
+                >
+                  {copiedId === 'tts_scene' ? <><Check size={12}/> 복사됨</> : <><Copy size={12}/> 복사</>}
+                </button>
+              </div>
+              <div style={fieldStyle}>{sceneText}</div>
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={labelStyle}>Sample Context</div>
+                <button
+                  className="btn-primary"
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.625rem' }}
+                  onClick={() => copyText(contextText, 'tts_context')}
+                >
+                  {copiedId === 'tts_context' ? <><Check size={12}/> 복사됨</> : <><Copy size={12}/> 복사</>}
+                </button>
+              </div>
+              <div style={fieldStyle}>{contextText}</div>
+            </div>
+
+            <div style={{ fontSize: '0.75rem', color: '#475569', lineHeight: 1.5 }}>
+              대본 블록에는 <code style={{ padding: '0 0.25rem', backgroundColor: '#dbeafe', borderRadius: 3 }}>[웃음]</code>·<code style={{ padding: '0 0.25rem', backgroundColor: '#dbeafe', borderRadius: 3 }}>[멈춤]</code> 같은 지문을 넣지 않아도 됩니다 — 정말 필요한 순간에만 수동으로 추가하세요.
             </div>
           </div>
         );

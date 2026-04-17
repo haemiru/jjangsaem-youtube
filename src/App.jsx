@@ -47,7 +47,7 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const INIT_STATE = {
-  plan: { topic: '', format: '쇼츠 60초', targets: ['부모'], ebookName: '', ebookSummary: '', ebookUrl: '', tone: '따뜻한', model: 'claude-opus-4-6', characterImage: '', characterDescription: '' },
+  plan: { mode: 'ebook', topic: '', format: '쇼츠 60초', targets: ['부모'], ebookName: '', ebookSummary: '', ebookUrl: '', tone: '따뜻한', model: 'claude-opus-4-6', characterImage: '', characterDescription: '' },
   benchmark: { channels: [], thumbnailPatterns: [], titleFormulas: [], tagPool: [] },
   script: { hook: '', empathy: '', twist: '', sections: [], cta: '', titleSuggestions: [], thumbnailCopies: [] },
   media: { selectedThumbnailCopy: '', imagePrompts: [], generatedImages: [], selectedThumbnail: '' },

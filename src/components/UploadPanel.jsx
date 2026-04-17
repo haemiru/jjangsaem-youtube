@@ -108,7 +108,7 @@ export default function UploadPanel({ globalState, updateState, onNext, setActiv
 최종 제목 후보: ${titleCands}
 핵심 메시지: ${keyMsgs}
 전체 대본: ${fullScript.substring(0, 3000)}
-연계 전자책: ${plan.ebookName}
+${plan.mode === 'topic' ? `연결 리소스: 짱샘의 책방 (${plan.ebookUrl || 'https://jjangsaem.com'}) — 이 영상은 전자책이 아닌 주제 기반 기획이므로, 디스크립션 CTA에는 "짱샘의 책방 방문 + 구독"을 매번 다른 표현으로 자연스럽게 녹여주세요` : `연계 전자책: ${plan.ebookName}`}
 대상 시청자: ${plan.targets.join(', ')}
 
 [벤치마킹 정보]
@@ -183,11 +183,12 @@ JSON만 출력.`;
         parsed = JSON.parse(cleaned.substring(startIdx, endIdx + 1));
       }
 
-      // Auto Append ebook link
+      // Auto Append ebook / bookstore link
       if (plan.ebookUrl) {
         parsed.description.text = parsed.description.text.replace(/jjangsaem\.com\/[^\s]*/g, plan.ebookUrl);
         if (!parsed.description.text.includes(plan.ebookUrl)) {
-          parsed.description.text += `\n\n📚 연계 전자책 보기: ${plan.ebookUrl}`;
+          const linkLabel = plan.mode === 'topic' ? '📚 짱샘의 책방 방문하기' : '📚 연계 전자책 보기';
+          parsed.description.text += `\n\n${linkLabel}: ${plan.ebookUrl}`;
         }
       }
 
@@ -204,7 +205,7 @@ JSON만 출력.`;
       console.error(err);
       setUsedFallback(true);
       // Fallback Mock
-      const ebookLine = plan.ebookUrl ? `\n\n📚 연계 전자책 보기: ${plan.ebookUrl}` : '';
+      const ebookLine = plan.ebookUrl ? `\n\n${plan.mode === 'topic' ? '📚 짱샘의 책방 방문하기' : '📚 연계 전자책 보기'}: ${plan.ebookUrl}` : '';
       const chLinks = `\n\n━━━━━━━━━━━━━━━━━━━━\n📸 짱샘의 인스타: @seochojiye\n📝 짱샘의 블로그: https://blog.naver.com/imoim77\n💬 카카오톡 문의: https://open.kakao.com/o/s3YnSoni`;
       const fallback = {
         cot_log: "1. 검색 의도 분석...\n2. 키워드 계층 설계...\n3. 제목 선택...\n...",
