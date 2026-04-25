@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader2, CheckCircle2, Circle, PlayCircle, BookOpen, Search } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -16,6 +16,14 @@ export default function PlanPanel({ globalState, updateState, onNext }) {
   const [summaryError, setSummaryError] = useState('');
   const [seriesError, setSeriesError] = useState('');
   const [topicSeed, setTopicSeed] = useState('');
+
+  // 외부에서 plan.topic이 채워져 들어온 경우(주제 검색→새 프로젝트, 저장된 프로젝트 로드 등)
+  // 비어있는 topicSeed에 한해 동기화. 사용자가 입력 중인 값은 덮어쓰지 않음.
+  useEffect(() => {
+    if (mode === 'topic' && data.topic) {
+      setTopicSeed(prev => prev || data.topic);
+    }
+  }, [data.topic, mode]);
 
   const handleChange = (key, value) => {
     updateState('plan', { ...data, [key]: value });
