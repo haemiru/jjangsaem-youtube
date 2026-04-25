@@ -18,6 +18,12 @@ export default function UploadPanel({ globalState, updateState, onNext, setActiv
   // Local metadata state for editing before upload
   const [localMeta, setLocalMeta] = useState(null);
 
+  // Metadata generation mode: null | 'auto' | 'manual'
+  const [metaMode, setMetaMode] = useState(null);
+  const [manualMetaInput, setManualMetaInput] = useState('');
+  const [manualMetaError, setManualMetaError] = useState('');
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+
   // UI states
   const [showCot, setShowCot] = useState({ title: false, desc: false });
   const [newTag, setNewTag] = useState('');
@@ -89,20 +95,17 @@ export default function UploadPanel({ globalState, updateState, onNext, setActiv
     }
   }, []);
 
-  // --- Metadata Generation (same as before) ---
-  const generateMetadata = async () => {
-    setError('');
-    setIsGenerating(true);
+  // --- Shared helpers (used by both auto and manual modes) ---
+  const META_SYSTEM_PROMPT = "당신은 유튜브 SEO 전문가이자 jjangsaem.com 콘텐츠 전략가입니다. 한국 육아·발달 분야 유튜브 채널의 검색 최적화에 특화되어 있습니다. 항상 JSON 형식으로만 응답합니다.";
 
-    try {
-      const titleCands = script.titleSuggestions?.map(t => t.text).join(', ') || script.final_title || '';
-      const keyMsgs = script.sections?.map(s => s.key_message).join(', ') || '';
-      const formula = JSON.stringify(benchmark.titleFormulas?.formulas || []);
-      const tags = (benchmark.tagPool || []).join(', ');
+  const buildMetaPrompt = () => {
+    const titleCands = script.titleSuggestions?.map(t => t.text).join(', ') || script.final_title || '';
+    const keyMsgs = script.sections?.map(s => s.key_message).join(', ') || '';
+    const formula = JSON.stringify(benchmark.titleFormulas?.formulas || []);
+    const tags = (benchmark.tagPool || []).join(', ');
+    const fullScript = script.full_script || script.rows?.map(r => r.script).join('\n') || '';
 
-      const fullScript = script.full_script || script.rows?.map(r => r.script).join('\n') || '';
-      const systemPrompt = "당신은 유튜브 SEO 전문가이자 jjangsaem.com 콘텐츠 전략가입니다. 한국 육아·발달 분야 유튜브 채널의 검색 최적화에 특화되어 있습니다. 항상 JSON 형식으로만 응답합니다.";
-      const prompt = `아래 정보를 바탕으로 유튜브 메타데이터를 작성해줘.
+    return `아래 정보를 바탕으로 유튜브 메타데이터를 작성해줘.
 
 [대본 정보]
 최종 제목 후보: ${titleCands}
@@ -148,7 +151,60 @@ ${plan.mode === 'topic' ? `연결 리소스: 짱샘의 책방 (${plan.ebookUrl |
   "revision_count": 2
 }
 JSON만 출력.`;
+  };
 
+  const MANUAL_META_PREFIX = `[중요 지시] 아래는 유튜브 메타데이터 자동화 파이프라인의 프롬프트입니다.
+반드시 JSON 객체 하나만 출력하세요. 인사·설명·코드블록 마커는 모두 금지하고, JSON 외의 텍스트는 일절 포함하지 마세요.
+
+`;
+
+  const parseMetaJSON = (rawText) => {
+    let cleaned = rawText.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+    const codeBlockMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+    if (codeBlockMatch) cleaned = codeBlockMatch[1].trim();
+    try { return JSON.parse(cleaned); } catch {
+      const startIdx = cleaned.indexOf('{');
+      if (startIdx === -1) throw new Error('JSON 파싱 실패: { 를 찾을 수 없습니다');
+      let depth = 0, endIdx = -1;
+      for (let i = startIdx; i < cleaned.length; i++) {
+        if (cleaned[i] === '{') depth++;
+        else if (cleaned[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
+      }
+      if (endIdx === -1) throw new Error('JSON 파싱 실패: 불완전한 JSON');
+      return JSON.parse(cleaned.substring(startIdx, endIdx + 1));
+    }
+  };
+
+  const applyMetaPostProcess = (parsed) => {
+    if (!parsed?.description?.text) return parsed;
+
+    if (plan.ebookUrl) {
+      parsed.description.text = parsed.description.text.replace(/jjangsaem\.com\/[^\s]*/g, plan.ebookUrl);
+      if (!parsed.description.text.includes(plan.ebookUrl)) {
+        const linkLabel = plan.mode === 'topic' ? '📚 짱샘의 책방 방문하기' : '📚 연계 전자책 보기';
+        parsed.description.text += `\n\n${linkLabel}: ${plan.ebookUrl}`;
+      }
+    }
+
+    const channelLinks = `\n\n━━━━━━━━━━━━━━━━━━━━\n📸 짱샘의 인스타: @seochojiye\n📝 짱샘의 블로그: https://blog.naver.com/imoim77\n💬 카카오톡 문의: https://open.kakao.com/o/s3YnSoni`;
+    if (!parsed.description.text.includes('blog.naver.com/imoim77')) {
+      parsed.description.text += channelLinks;
+    }
+    return parsed;
+  };
+
+  const commitMeta = (parsed) => {
+    setLocalMeta(parsed);
+    updateState('metadata', { ...metadata, ...parsed, cotLog: parsed.cot_log });
+  };
+
+  // --- Auto Mode: API call ---
+  const generateMetadata = async () => {
+    setError('');
+    setUsedFallback(false);
+    setIsGenerating(true);
+
+    try {
       const res = await fetchWithRetry('/api/anthropic/v1/messages', {
         method: 'POST',
         headers: {
@@ -158,53 +214,18 @@ JSON만 출력.`;
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 8192,
-          system: systemPrompt,
-          messages: [{ role: "user", content: prompt }]
+          system: META_SYSTEM_PROMPT,
+          messages: [{ role: "user", content: buildMetaPrompt() }]
         })
       });
 
       if (!res.ok) throw new Error('메타데이터 API 통신 실패');
       const data = await res.json();
-      const rawText = data.content[0].text;
-      // <thinking> 태그 제거 후 robust JSON 파싱
-      let cleaned = rawText.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
-      const codeBlockMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-      if (codeBlockMatch) cleaned = codeBlockMatch[1].trim();
-      let parsed;
-      try { parsed = JSON.parse(cleaned); } catch {
-        const startIdx = cleaned.indexOf('{');
-        if (startIdx === -1) throw new Error('JSON 파싱 실패');
-        let depth = 0, endIdx = -1;
-        for (let i = startIdx; i < cleaned.length; i++) {
-          if (cleaned[i] === '{') depth++;
-          else if (cleaned[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
-        }
-        if (endIdx === -1) throw new Error('JSON 파싱 실패: 불완전한 JSON');
-        parsed = JSON.parse(cleaned.substring(startIdx, endIdx + 1));
-      }
-
-      // Auto Append ebook / bookstore link
-      if (plan.ebookUrl) {
-        parsed.description.text = parsed.description.text.replace(/jjangsaem\.com\/[^\s]*/g, plan.ebookUrl);
-        if (!parsed.description.text.includes(plan.ebookUrl)) {
-          const linkLabel = plan.mode === 'topic' ? '📚 짱샘의 책방 방문하기' : '📚 연계 전자책 보기';
-          parsed.description.text += `\n\n${linkLabel}: ${plan.ebookUrl}`;
-        }
-      }
-
-      // Auto Append channel links
-      const channelLinks = `\n\n━━━━━━━━━━━━━━━━━━━━\n📸 짱샘의 인스타: @seochojiye\n📝 짱샘의 블로그: https://blog.naver.com/imoim77\n💬 카카오톡 문의: https://open.kakao.com/o/s3YnSoni`;
-      if (!parsed.description.text.includes('blog.naver.com/imoim77')) {
-        parsed.description.text += channelLinks;
-      }
-
-      setLocalMeta(parsed);
-      updateState('metadata', { ...metadata, ...parsed, cotLog: parsed.cot_log });
-
+      const parsed = applyMetaPostProcess(parseMetaJSON(data.content[0].text));
+      commitMeta(parsed);
     } catch (err) {
       console.error(err);
       setUsedFallback(true);
-      // Fallback Mock
       const ebookLine = plan.ebookUrl ? `\n\n${plan.mode === 'topic' ? '📚 짱샘의 책방 방문하기' : '📚 연계 전자책 보기'}: ${plan.ebookUrl}` : '';
       const chLinks = `\n\n━━━━━━━━━━━━━━━━━━━━\n📸 짱샘의 인스타: @seochojiye\n📝 짱샘의 블로그: https://blog.naver.com/imoim77\n💬 카카오톡 문의: https://open.kakao.com/o/s3YnSoni`;
       const fallback = {
@@ -215,11 +236,42 @@ JSON만 출력.`;
         hashtags: ['#육아꿀팁', '#터미타임', '#jjangsaem'],
         revision_count: 1
       };
-      setLocalMeta(fallback);
-      updateState('metadata', { ...metadata, ...fallback, cotLog: fallback.cot_log });
+      commitMeta(fallback);
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // --- Manual Mode: paste claude.ai response ---
+  const handleManualMetaSubmit = () => {
+    setManualMetaError('');
+    try {
+      const parsed = applyMetaPostProcess(parseMetaJSON(manualMetaInput));
+      if (!parsed?.title?.text || !parsed?.description?.text || !parsed?.tags?.list) {
+        throw new Error('JSON 구조가 올바르지 않습니다 (title.text / description.text / tags.list 필요)');
+      }
+      commitMeta(parsed);
+      setManualMetaInput('');
+      setMetaMode(null);
+    } catch (err) {
+      setManualMetaError(err.message || 'JSON 파싱 실패');
+    }
+  };
+
+  const copyManualPrompt = () => {
+    const fullPrompt = MANUAL_META_PREFIX + buildMetaPrompt();
+    navigator.clipboard.writeText(fullPrompt).then(() => {
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 2000);
+    });
+  };
+
+  const resetMetaMode = () => {
+    setMetaMode(null);
+    setManualMetaInput('');
+    setManualMetaError('');
+    setLocalMeta(null);
+    setUsedFallback(false);
   };
 
   // --- Real YouTube Upload ---
@@ -322,18 +374,105 @@ JSON만 출력.`;
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   };
 
-  // --- Render: Metadata not generated yet ---
+  // --- Render: Manual mode prompt + paste UI ---
+  if (!localMeta && metaMode === 'manual') {
+    const fullPrompt = MANUAL_META_PREFIX + buildMetaPrompt();
+    return (
+      <div className="panel-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 className="panel-title" style={{ margin: 0 }}>수동 모드 — 메타데이터 생성</h2>
+          <button className="btn-secondary" onClick={() => { setMetaMode(null); setManualMetaInput(''); setManualMetaError(''); }}>
+            모드 선택으로 돌아가기
+          </button>
+        </div>
+
+        <div style={{ padding: '1rem', backgroundColor: 'var(--gray-100)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
+          1) 아래 프롬프트 복사 → 2) claude.ai에 붙여넣고 실행 → 3) 응답 JSON을 아래 입력란에 붙여넣고 적용
+        </div>
+
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <strong style={{ fontSize: '0.9375rem' }}>① 프롬프트</strong>
+            <button className="btn-primary" style={{ fontSize: '0.8125rem', padding: '0.375rem 0.75rem' }} onClick={copyManualPrompt}>
+              {copiedPrompt ? <><Check size={14}/> 복사됨</> : <><Copy size={14}/> 프롬프트 복사</>}
+            </button>
+          </div>
+          <div style={{ padding: '0.75rem', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', fontFamily: 'monospace', lineHeight: '1.5', maxHeight: '300px', overflowY: 'auto', whiteSpace: 'pre-wrap', color: 'var(--text-muted)' }}>
+            {fullPrompt}
+          </div>
+        </div>
+
+        <div>
+          <strong style={{ fontSize: '0.9375rem', display: 'block', marginBottom: '0.5rem' }}>② claude.ai 응답 붙여넣기</strong>
+          <textarea
+            className="form-control"
+            style={{ minHeight: '200px', fontFamily: 'monospace', fontSize: '0.8125rem' }}
+            placeholder='{ "cot_log": "...", "title": { "text": "...", "score": 92, ... }, ... }'
+            value={manualMetaInput}
+            onChange={e => setManualMetaInput(e.target.value)}
+          />
+          {manualMetaError && <div style={{ color: '#dc2626', fontSize: '0.875rem', marginTop: '0.5rem' }}>{manualMetaError}</div>}
+          <button
+            className="btn-primary"
+            style={{ marginTop: '0.75rem', width: '100%' }}
+            onClick={handleManualMetaSubmit}
+            disabled={!manualMetaInput.trim()}
+          >
+            결과 적용 → 메타데이터 검토
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Render: Mode selection ---
   if (!localMeta && !isGenerating) {
     return (
       <div className="panel-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
         <FileText size={48} color="var(--gray-300)" style={{ marginBottom: '1rem' }} />
-        <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>최적화 메타데이터 생성</h2>
+        <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>최적화 메타데이터 생성</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', textAlign: 'center' }}>
           대본 및 벤치마킹 데이터를 분석하여 유튜브 SEO에 최적화된<br/>제목, 설명, 태그를 자동으로 생성하고 자기평가를 진행합니다.
         </p>
-        <button className="btn-primary" onClick={generateMetadata}>
-          <Play size={18} /> 메타데이터 생성 시작
-        </button>
+
+        <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem', width: '100%', maxWidth: '600px' }}>
+          {/* Auto mode */}
+          <div
+            onClick={() => setMetaMode('auto')}
+            style={{ flex: 1, padding: '1.5rem', border: `2px solid ${metaMode === 'auto' ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s' }}
+            onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
+            onMouseLeave={(e) => e.currentTarget.style.borderColor = metaMode === 'auto' ? 'var(--primary)' : 'var(--border)'}
+          >
+            <Play size={32} color="var(--primary)" style={{ marginBottom: '0.75rem' }} />
+            <div style={{ fontWeight: 700, marginBottom: '0.5rem' }}>자동 모드</div>
+            <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+              API로 자동 생성<br/>
+              <span style={{ fontSize: '0.75rem' }}>(Sonnet 4.6 사용)</span>
+            </div>
+          </div>
+
+          {/* Manual mode */}
+          <div
+            onClick={() => setMetaMode('manual')}
+            style={{ flex: 1, padding: '1.5rem', border: '2px solid var(--border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s' }}
+            onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
+            onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
+          >
+            <Copy size={32} color="var(--primary)" style={{ marginBottom: '0.75rem' }} />
+            <div style={{ fontWeight: 700, marginBottom: '0.5rem' }}>수동 모드</div>
+            <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+              프롬프트 복사 → claude.ai 실행 → 결과 붙여넣기<br/>
+              <span style={{ fontSize: '0.75rem' }}>(API 비용 무료)</span>
+            </div>
+          </div>
+        </div>
+
+        {metaMode === 'auto' && (
+          <button className="btn-primary" onClick={generateMetadata}>
+            <Play size={18} /> 메타데이터 자동 생성 시작
+          </button>
+        )}
+
         {error && <div style={{ color: 'red', marginTop: '1rem' }}>{error}</div>}
       </div>
     );
@@ -354,7 +493,7 @@ JSON만 출력.`;
     <div className="panel-card" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 className="panel-title" style={{ margin: 0 }}>메타데이터 (SEO) 검토 및 업로드</h2>
-        <button className="btn-secondary" onClick={generateMetadata}>전체 재생성</button>
+        <button className="btn-secondary" onClick={resetMetaMode}><RefreshCw size={16}/> 전체 재생성</button>
       </div>
 
       {usedFallback && (
