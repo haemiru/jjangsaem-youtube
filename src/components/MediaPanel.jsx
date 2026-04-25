@@ -4,12 +4,12 @@ import { synthesizeAllSections, STYLE_PROMPTS, TONE_OPTIONS, VOICE_OPTIONS, SPEE
 import { buildTimingsFromAlignment, getAudioDurationFromFile } from '../services/sttService';
 import { VideoGenerator } from '../services/videoGenerator';
 
-const COMMON_SUFFIX = ", for Korean audience, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content, do not place text in the bottom 20% of the frame (reserved for subtitles) but characters and props can use the full frame, all text in the image must be in Korean (한글) only, no English text, no headlines, no background sentences, minimalist design";
+const COMMON_SUFFIX = ", for Korean audience, warm and professional style, clean background, high quality, bright lighting, suitable for educational YouTube content, do not place text in the bottom 20% of the frame (reserved for subtitles) but characters and props can use the full frame, all text in the image must be in Korean (한글) only, no English text, no headlines, no background sentences, minimalist design, preserve EXACT colors from the character reference image with no color drift (do NOT shift blue toward teal/turquoise/green-blue, do NOT shift orange toward yellow/red, do NOT shift any color toward a similar shade)";
 
 const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
 const DELAY_BETWEEN_REQUESTS_MS = 3000;
 
-async function generateImageWithGemini(prompt, referenceImage = null, retries = 3) {
+async function generateImageWithGemini(prompt, referenceImage = null, retries = 3, colorLock = '') {
   // Routed through server-side proxy — API key injected by proxy
   const url = `/api/gemini/models/${GEMINI_MODEL}:generateContent`;
 
@@ -21,8 +21,24 @@ async function generateImageWithGemini(prompt, referenceImage = null, retries = 
         // Extract base64 and mimeType from data URL
         const match = referenceImage.match(/^data:(image\/\w+);base64,(.+)$/);
         if (match) {
+          const colorLockBlock = colorLock
+            ? `\n\nCHARACTER COLOR SPEC (treat as ground truth — use these exact named colors and HEX values, NOT approximations):\n${colorLock}\n`
+            : '';
           reqParts.push({
-            text: `Use the character from the reference image below as the main character. Maintain consistent appearance, style, and features.\n\n${prompt}`
+            text: `Use the character from the reference image below as the main character. Maintain consistent appearance, style, features, line weight, and color palette.
+
+CRITICAL — EXACT COLOR PRESERVATION (highest priority rule):
+- Match the EXACT colors of the character's clothing, hair, skin, and accessories from the reference image, pixel-for-pixel.
+- DO NOT shift, drift, reinterpret, or "improve" any color. Sample colors directly from the reference image rather than guessing.
+- FORBIDDEN color drifts (these are common mistakes — explicitly avoid):
+  • blue → teal / turquoise / green-blue / cyan
+  • orange → yellow / red / coral
+  • red → pink / magenta
+  • brown → black / dark grey
+  • green → olive / mint / teal
+- If the reference shows pure cobalt blue clothing, the output MUST be the same cobalt blue, NOT teal, NOT turquoise.${colorLockBlock}
+
+${prompt}`
           });
           reqParts.push({
             inlineData: { mimeType: match[1], data: match[2] }
@@ -328,7 +344,7 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
 
       try {
         const dataUrl = imageModel === 'gemini'
-          ? await generateImageWithGemini(newQueue[i].prompt, characterRef)
+          ? await generateImageWithGemini(newQueue[i].prompt, characterRef, 3, plan?.characterColorLock || '')
           : await generateImageWithReplicate(newQueue[i].prompt, imageModel, characterRef);
         newQueue[i].url = dataUrl;
         newQueue[i].status = 'done';
@@ -382,7 +398,7 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
 
     try {
       const dataUrl = imageModel === 'gemini'
-        ? await generateImageWithGemini(newQueue[idx].prompt, characterRef)
+        ? await generateImageWithGemini(newQueue[idx].prompt, characterRef, 3, plan?.characterColorLock || '')
         : await generateImageWithReplicate(newQueue[idx].prompt, imageModel, characterRef);
       newQueue[idx].url = dataUrl;
       newQueue[idx].status = 'done';
@@ -756,6 +772,24 @@ export default function MediaPanel({ globalState, updateState, onNext, disabled 
                 reader.readAsDataURL(file);
               }} />
             </label>
+          </div>
+        </div>
+
+        {/* Character color lock — applied to every image prompt to prevent color drift */}
+        <div style={{ marginTop: '0.75rem' }}>
+          <label className="form-label" style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
+            캐릭터 색상 락 (선택) — HEX/구체적 색상명으로 지정하면 모든 이미지에 강제 적용
+          </label>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="예: cobalt blue scrubs (#2C5F8D), orange V-neck accent (#FF9933), brown hair (#5C3A21)"
+            value={plan?.characterColorLock || ''}
+            onChange={(e) => updateState('plan', { ...plan, characterColorLock: e.target.value })}
+            style={{ width: '100%', fontSize: '0.85rem' }}
+          />
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+            "blue"처럼 모호한 단어 대신 "cobalt blue (#2C5F8D)" 같이 구체적으로 적으세요. 비워두면 일반 색상 보존 규칙만 적용됩니다.
           </div>
         </div>
       </div>

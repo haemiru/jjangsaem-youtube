@@ -47,7 +47,7 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const INIT_STATE = {
-  plan: { mode: 'ebook', topic: '', format: '쇼츠 60초', targets: ['부모'], ebookName: '', ebookSummary: '', ebookUrl: '', tone: '따뜻한', model: 'claude-opus-4-6', characterImage: '', characterDescription: '' },
+  plan: { mode: 'ebook', topic: '', format: '쇼츠 60초', targets: ['부모'], ebookName: '', ebookSummary: '', ebookUrl: '', tone: '따뜻한', model: 'claude-opus-4-6', characterImage: '', characterDescription: '', characterColorLock: '' },
   benchmark: { channels: [], thumbnailPatterns: [], titleFormulas: [], tagPool: [] },
   script: { hook: '', empathy: '', twist: '', sections: [], cta: '', titleSuggestions: [], thumbnailCopies: [] },
   media: { selectedThumbnailCopy: '', imagePrompts: [], generatedImages: [], selectedThumbnail: '' },
@@ -273,6 +273,37 @@ export default function App() {
     }
   };
 
+  // 주제 검색에서 선택한 주제로 프로젝트 즉시 생성 — plan은 'topic' 모드로 자동 셋팅
+  const handleCreateProjectFromTopic = async (topic) => {
+    if (!uid || !topic) return;
+    const trimmed = topic.trim();
+    const projectName = trimmed.slice(0, 40) || '주제 기반 프로젝트';
+    const seedState = {
+      ...INIT_STATE,
+      plan: {
+        ...INIT_STATE.plan,
+        mode: 'topic',
+        topic: trimmed,
+        ebookName: `주제: ${trimmed}`,
+        ebookUrl: 'https://jjangsaem.com',
+      },
+    };
+    try {
+      const newId = await createProject(uid, projectName, seedState);
+      setCurrentProjectId(newId);
+      setCurrentProjectName(projectName);
+      setGlobalState(seedState);
+      setActiveTab('plan');
+      localStorage.setItem(LAST_PROJECT_KEY, newId);
+      lastSavedRef.current = null;
+      setProjectListOpen(false);
+      refreshProjects().catch(() => {});
+    } catch (err) {
+      console.error('주제 기반 프로젝트 생성 실패:', err);
+      alert('프로젝트 생성 실패: ' + err.message);
+    }
+  };
+
   const handleDeleteProject = async (projectId) => {
     try {
       await deleteProject(projectId);
@@ -422,6 +453,7 @@ export default function App() {
         currentProjectId={currentProjectId}
         onSelect={handleSelectProject}
         onCreate={handleCreateProject}
+        onCreateFromTopic={handleCreateProjectFromTopic}
         onDelete={handleDeleteProject}
         onRename={handleRenameProject}
         loading={projectsLoading}

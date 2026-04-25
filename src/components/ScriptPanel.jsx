@@ -90,6 +90,10 @@ export default function ScriptPanel({ globalState, updateState, onNext }) {
     ? `캐릭터 설명: ${plan.characterDescription}`
     : '업로드된 캐릭터 이미지를 참고';
 
+  const colorLock = plan.characterColorLock
+    ? `캐릭터 색상 스펙 (절대 변경 금지 — 모든 image_prompt에 그대로 포함할 것): ${plan.characterColorLock}`
+    : '';
+
   // row 1개 = 이미지 1장 → 한 문장 = 1 row (짧은 감탄사/추임새는 앞뒤 문장에 합침)
   const lengthGuide = (() => {
     const f = plan.format;
@@ -380,6 +384,11 @@ JSON만 출력.`;
    - CRITICAL: Do NOT include any other text, titles, headlines, captions, or sentences in the image. Only the specified Korean keyword should be visible.
    - Focus on character pose, expression, simple props/icons
    - Do NOT place any text in the bottom 20% of the frame (reserved for video subtitles). Characters and props can use the full frame freely.
+
+   [COLOR PRESERVATION — image generators tend to drift colors toward similar shades. Prevent this:]
+   ${colorLock ? `- ${colorLock}\n   - In EVERY image_prompt, restate the character's clothing/hair colors using the exact named colors and HEX from the spec above. Example: "wearing cobalt blue scrubs (#2C5F8D) with orange V-neck accent (#FF9933)".\n   - Append a negative color clause to every image_prompt that shows the character: ", preserve exact reference colors, NOT teal, NOT turquoise, NOT green-blue, NOT color-shifted".`
+     : `- Always describe the character's clothing color using a SPECIFIC named color (e.g., "cobalt blue", "royal blue", "navy blue" — never just "blue"). If a HEX code is known, include it in parentheses.\n   - Append a negative color clause to every image_prompt that shows the character: ", preserve exact reference image colors, NOT teal, NOT turquoise, NOT green-blue, NOT color-shifted".`}
+
 각 row의 video_prompt: Write in ENGLISH. A prompt to animate the image into a 5-second video.
    - Include camera movement, character animation, visual effects, etc.
    - Do NOT mention any text animation (text is added in post-production)
@@ -408,7 +417,7 @@ JSON만 출력.`;
 
   const styleGuide = `[스타일 가이드]
 - 이 영상은 특정 캐릭터를 활용한 화이트보드 애니메이션 스타일입니다.
-- ${charDesc}
+- ${charDesc}${colorLock ? `\n- ${colorLock}` : ''}
 - 모든 이미지는 흰색 배경 위에 캐릭터와 간단한 텍스트/아이콘으로 구성됩니다.
 - Nick Invests 채널처럼 깔끔하고 미니멀한 교육 콘텐츠 스타일입니다.`;
 

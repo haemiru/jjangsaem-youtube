@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Plus, FolderOpen, Trash2, Pencil, Clock, Loader2 } from 'lucide-react';
+import { X, Plus, FolderOpen, Trash2, Pencil, Clock, Loader2, Sparkles, Search, ArrowRight } from 'lucide-react';
+import { researchTrendingTopics, TOPIC_CATEGORIES } from '../services/topicResearchService';
 
 const TAB_LABELS = {
   plan: '기획',
@@ -17,6 +18,7 @@ export default function ProjectManager({
   currentProjectId,
   onSelect,
   onCreate,
+  onCreateFromTopic,
   onDelete,
   onRename,
   loading,
@@ -26,7 +28,46 @@ export default function ProjectManager({
   const [renameValue, setRenameValue] = useState('');
   const [creating, setCreating] = useState(false);
 
+  // --- 주제 검색 상태 ---
+  const [topicSearchOpen, setTopicSearchOpen] = useState(false);
+  const [selectedCats, setSelectedCats] = useState(TOPIC_CATEGORIES);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [topicResults, setTopicResults] = useState([]);
+  const [resultMeta, setResultMeta] = useState(null); // { sourceCount, lookbackDays }
+
   if (!open) return null;
+
+  const toggleCat = (cat) => {
+    setSelectedCats(prev =>
+      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+    );
+  };
+
+  const runTopicSearch = async () => {
+    setSearching(true);
+    setSearchError('');
+    setTopicResults([]);
+    try {
+      const cats = selectedCats.length > 0 ? selectedCats : TOPIC_CATEGORIES;
+      const { topics, sourceCount } = await researchTrendingTopics(cats, { lookbackDays: 60 });
+      setTopicResults(topics);
+      setResultMeta({ sourceCount, lookbackDays: 60 });
+      if (topics.length === 0) {
+        setSearchError('추출된 주제가 없습니다. 카테고리를 다시 선택해보세요.');
+      }
+    } catch (err) {
+      console.error(err);
+      setSearchError('주제 검색 실패: ' + err.message);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const pickTopic = async (topic) => {
+    if (!onCreateFromTopic) return;
+    await onCreateFromTopic(topic);
+  };
 
   const handleCreate = async () => {
     const name = newName.trim();
@@ -61,7 +102,7 @@ export default function ProjectManager({
 
         <div className="modal-body">
           {/* New project input */}
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
             <input
               className="form-control"
               value={newName}
@@ -79,6 +120,152 @@ export default function ProjectManager({
               {creating ? <Loader2 className="animate-spin" size={16} /> : <><Plus size={16} /> 생성</>}
             </button>
           </div>
+
+          {/* 주제 검색 토글 버튼 */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <button
+              className="btn-secondary"
+              onClick={() => setTopicSearchOpen(v => !v)}
+              style={{
+                width: '100%',
+                padding: '0.6rem 1rem',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem',
+                borderStyle: 'dashed',
+              }}
+            >
+              <Sparkles size={16} />
+              {topicSearchOpen ? '주제 검색 닫기' : '주제 검색 — 최근 2개월 부모 관심사 5개 추천'}
+            </button>
+          </div>
+
+          {topicSearchOpen && (
+            <div
+              style={{
+                padding: '1rem',
+                marginBottom: '1.25rem',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--gray-50, #f9fafb)',
+              }}
+            >
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+                카테고리 선택 (선택한 키워드의 최근 60일 인기 YouTube 영상을 분석합니다)
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                {TOPIC_CATEGORIES.map(cat => {
+                  const active = selectedCats.includes(cat);
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => toggleCat(cat)}
+                      style={{
+                        padding: '0.3rem 0.65rem',
+                        borderRadius: '999px',
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        border: active ? '2px solid var(--primary)' : '1px solid var(--border)',
+                        background: active ? 'var(--secondary)' : 'var(--surface)',
+                        color: active ? 'var(--primary)' : 'var(--text-muted)',
+                        fontWeight: active ? 700 : 500,
+                      }}
+                    >
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <button
+                  className="btn-primary"
+                  onClick={runTopicSearch}
+                  disabled={searching || selectedCats.length === 0}
+                  style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
+                >
+                  {searching ? (
+                    <><Loader2 className="animate-spin" size={14} /> YouTube + Claude 분석 중...</>
+                  ) : (
+                    <><Search size={14} /> 주제 검색 실행</>
+                  )}
+                </button>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  선택 카테고리 {selectedCats.length}개
+                </span>
+              </div>
+
+              {searchError && (
+                <div style={{ color: '#dc2626', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                  {searchError}
+                </div>
+              )}
+
+              {topicResults.length > 0 && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                    YouTube 영상 {resultMeta?.sourceCount ?? 0}개를 분석한 추천 주제 — 카드를 클릭하면 "주제 기반 기획"으로 새 프로젝트가 생성됩니다.
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {topicResults.map((t, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => pickTopic(t.title)}
+                        style={{
+                          textAlign: 'left',
+                          padding: '0.75rem 0.9rem',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius-md)',
+                          background: 'var(--surface)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '0.6rem',
+                          transition: 'all 0.12s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--primary)';
+                          e.currentTarget.style.background = 'var(--secondary)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--border)';
+                          e.currentTarget.style.background = 'var(--surface)';
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
+                            {t.category && (
+                              <span style={{
+                                fontSize: '0.65rem',
+                                padding: '0.1rem 0.4rem',
+                                borderRadius: '4px',
+                                background: 'var(--primary)',
+                                color: 'white',
+                                fontWeight: 600,
+                              }}>
+                                {t.category}
+                              </span>
+                            )}
+                            <span style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text)' }}>
+                              {t.title}
+                            </span>
+                          </div>
+                          {t.why && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                              {t.why}
+                            </div>
+                          )}
+                        </div>
+                        <ArrowRight size={16} color="var(--primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Project list */}
           {loading ? (
