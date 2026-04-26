@@ -19,6 +19,47 @@ const ISO_DAYS_AGO = (days) => {
   return d.toISOString();
 };
 
+const TOPIC_HISTORY_KEY = 'jjangsaem.topicSearch.history';
+const TOPIC_HISTORY_MAX = 50;
+
+function getTopicHistory() {
+  try {
+    const raw = localStorage.getItem(TOPIC_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function appendTopicHistory(titles) {
+  if (!Array.isArray(titles) || titles.length === 0) return;
+  try {
+    const prev = getTopicHistory();
+    const seen = new Set(prev);
+    const merged = [...prev];
+    for (const t of titles) {
+      const trimmed = (t || '').trim();
+      if (!trimmed || seen.has(trimmed)) continue;
+      merged.push(trimmed);
+      seen.add(trimmed);
+    }
+    const trimmedHistory = merged.slice(-TOPIC_HISTORY_MAX);
+    localStorage.setItem(TOPIC_HISTORY_KEY, JSON.stringify(trimmedHistory));
+  } catch {
+    // localStorage 사용 불가 환경 — 무시
+  }
+}
+
+export function clearTopicHistory() {
+  try {
+    localStorage.removeItem(TOPIC_HISTORY_KEY);
+  } catch {
+    // noop
+  }
+}
+
 async function fetchYoutubeTopVideosForKeyword(keyword, publishedAfter, maxResults = 10) {
   const params = new URLSearchParams({
     part: 'snippet',
@@ -81,13 +122,18 @@ export async function researchTrendingTopics(categories, opts = {}) {
     })
     .join('\n\n');
 
+  const history = getTopicHistory();
+  const exclusionBlock = history.length > 0
+    ? `\n[이미 제안한 주제 — 반드시 제외, 변형/유사 표현도 금지]\n${history.map((t, i) => `  ${i + 1}. ${t}`).join('\n')}\n`
+    : '';
+
   const prompt = `당신은 한국 유튜브 트렌드 분석가입니다. 아래는 최근 ${lookbackDays}일 사이 한국에서 조회수가 많이 나온 YouTube 영상 목록입니다 (카테고리별).
 
 이 데이터를 분석해서, **부모(특히 발달장애·신경발달·재활 관련 자녀를 둔 부모)들의 최근 관심사**를 가장 잘 대표하는 **유튜브 영상 주제 5개**를 제안해주세요.
 
 [원천 데이터 — YouTube 인기 영상 타이틀]
 ${corpusBlock}
-
+${exclusionBlock}
 [채널 컨셉]
 "키즈피지오/짱샘" — 아이의 행동을 설명하는 채널이 아니라, 아이의 '신경계'를 이해하는 채널.
 대상: 발달이 걱정되는 아이를 키우는 부모.
@@ -99,6 +145,7 @@ ${corpusBlock}
 3. 클릭을 유발할 만한 부모의 실제 고민 (검색 의도가 명확)
 4. 5개 주제는 서로 겹치지 않게 (다른 카테고리/관점 분포)
 5. 단순 행동 설명이 아닌, 신경계·발달 메커니즘을 풀 수 있는 주제 우대
+6. "이미 제안한 주제"가 있다면, 그 목록과 의미상 겹치지 않는 새로운 각도/하위 주제로 제안 (같은 키워드라도 다른 관점·증상·연령대·대처법 등으로 변주)
 
 [출력 형식 — JSON만]
 {
@@ -121,6 +168,7 @@ topics 배열 길이는 정확히 5개. JSON만 출력.`;
     body: JSON.stringify({
       model,
       max_tokens: 2000,
+      temperature: 1,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -133,8 +181,10 @@ topics 배열 길이는 정확히 5개. JSON만 출력.`;
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('주제 JSON 파싱 실패');
   const parsed = JSON.parse(match[0]);
+  const topics = Array.isArray(parsed.topics) ? parsed.topics.slice(0, 5) : [];
+  appendTopicHistory(topics.map((t) => t?.title).filter(Boolean));
   return {
-    topics: Array.isArray(parsed.topics) ? parsed.topics.slice(0, 5) : [],
+    topics,
     sourceCount: totalVideoCount,
   };
 }
