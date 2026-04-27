@@ -50,9 +50,9 @@ export default function ProjectManager({
     setTopicResults([]);
     try {
       const cats = selectedCats.length > 0 ? selectedCats : TOPIC_CATEGORIES;
-      const { topics, sourceCount } = await researchTrendingTopics(cats, { lookbackDays: 60 });
+      const { topics, sourceCount, lookbackDays, perspective } = await researchTrendingTopics(cats);
       setTopicResults(topics);
-      setResultMeta({ sourceCount, lookbackDays: 60 });
+      setResultMeta({ sourceCount, lookbackDays, perspective });
       if (topics.length === 0) {
         setSearchError('추출된 주제가 없습니다. 카테고리를 다시 선택해보세요.');
       }
@@ -206,8 +206,21 @@ export default function ProjectManager({
               {topicResults.length > 0 && (
                 <div style={{ marginTop: '0.75rem' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                    YouTube 영상 {resultMeta?.sourceCount ?? 0}개를 분석한 추천 주제 — 카드를 클릭하면 "주제 기반 기획"으로 새 프로젝트가 생성됩니다.
+                    최근 {resultMeta?.lookbackDays ?? 60}일 YouTube 영상 {resultMeta?.sourceCount ?? 0}개 분석 — 카드 클릭 시 "주제 기반 기획"으로 새 프로젝트 생성.
                   </div>
+                  {resultMeta?.perspective && (
+                    <div style={{
+                      fontSize: '0.72rem',
+                      color: 'var(--primary)',
+                      background: 'var(--secondary)',
+                      padding: '0.4rem 0.6rem',
+                      borderRadius: 'var(--radius-sm, 6px)',
+                      marginBottom: '0.6rem',
+                      lineHeight: 1.4,
+                    }}>
+                      🔭 이번 각도: {resultMeta.perspective}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {topicResults.map((t, idx) => (
                       <button
