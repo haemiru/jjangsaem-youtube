@@ -338,9 +338,9 @@ export default function ProjectManager({
                           }}>
                             {TAB_LABELS[p.activeTab] || '기획'}
                           </span>
-                          {p.plan?.topic && (
+                          {(p.plan?.topicSeed || p.plan?.topic) && (
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {p.plan.topic}
+                              {p.plan.topicSeed || p.plan.topic}
                             </span>
                           )}
                           {p.updatedAt && (

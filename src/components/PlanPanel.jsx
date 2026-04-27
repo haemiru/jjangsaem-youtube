@@ -17,13 +17,15 @@ export default function PlanPanel({ globalState, updateState, onNext }) {
   const [seriesError, setSeriesError] = useState('');
   const [topicSeed, setTopicSeed] = useState('');
 
-  // 외부에서 plan.topic이 채워져 들어온 경우(주제 검색→새 프로젝트, 저장된 프로젝트 로드 등)
-  // 비어있는 topicSeed에 한해 동기화. 사용자가 입력 중인 값은 덮어쓰지 않음.
+  // 프로젝트 로드/생성 시 plan.topicSeed를 textarea로 동기화.
+  // plan.topicSeed는 시리즈 항목 선택으로 덮어써지지 않으므로 원본 주제가 유지됨.
+  // 레거시 프로젝트(topicSeed 없음)는 최초 로드 시 plan.topic으로 폴백.
   useEffect(() => {
-    if (mode === 'topic' && data.topic) {
-      setTopicSeed(prev => prev || data.topic);
+    if (mode === 'topic') {
+      setTopicSeed(data.topicSeed || data.topic || '');
     }
-  }, [data.topic, mode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.topicSeed, mode]);
 
   const handleChange = (key, value) => {
     updateState('plan', { ...data, [key]: value });
@@ -168,7 +170,7 @@ JSON만 출력. items 배열 길이는 반드시 4 (롱폼 1 + 쇼츠 3).`;
         status: 'pending'
       }));
 
-      updateState('plan', { ...data, mode: 'topic', ebookName: `주제: ${seed}`, ebookUrl: JJANGSAEM_BOOKSTORE_URL });
+      updateState('plan', { ...data, mode: 'topic', topic: seed, topicSeed: seed, ebookName: `주제: ${seed}`, ebookUrl: JJANGSAEM_BOOKSTORE_URL });
       updateState('seriesPlan', { ebookName: `주제: ${seed}`, items });
 
     } catch (err) {
